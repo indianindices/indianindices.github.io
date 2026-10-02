@@ -16,33 +16,8 @@ ROOT = Path(__file__).parent
 CSV_PATH = ROOT / "sectoraldata.csv"
 XLSX_PATH = ROOT / "sectoraldata.xlsx"
 
-NIFTY50 = [
-    ["5Yr Avg", -3.16, 4.76, 1.54, 2.57, 5.74],
-    [2026, -14.54, 6.87, -6.90, 0.00, -14.96],
-    [2025, -0.53, 8.49, -3.55, 6.17, 10.51],
-    [2024, 2.74, 7.54, 7.50, -8.39, 8.80],
-    [2023, -4.12, 10.54, 2.34, 10.66, 20.03],
-    [2022, 0.64, -9.65, 8.33, 5.91, 4.33],
-    [2021, 5.07, 7.02, 12.06, -1.50, 24.12],
-    [2020, -29.34, 19.82, 9.18, 24.31, 14.90],
-    [2019, 7.01, 1.42, -2.67, 6.05, 12.02],
-    [2018, -3.96, 5.94, 2.02, -0.62, 3.15],
-    [2017, 12.07, 3.78, 2.81, 7.58, 28.65],
-    [2016, -2.62, 7.10, 3.90, -4.94, 3.01],
-    [2015, 2.51, -1.44, -5.01, -0.03, -4.06],
-    [2014, 6.35, 13.53, 4.64, 3.99, 31.39],
-    [2013, -3.77, 2.81, -1.83, 9.92, 6.76],
-    [2012, 14.52, -0.31, 8.04, 3.54, 27.70],
-    [2011, -4.90, -3.19, -12.47, -6.45, -24.62],
-    [2010, 0.92, 1.21, 13.50, 1.73, 17.95],
-    [2009, 2.09, 42.04, 18.48, 2.30, 75.76],
-    [2008, -22.87, -14.66, -2.95, -24.53, -51.79],
-    [2007, -3.65, 13.00, 16.28, 22.25, 54.77],
-    [2006, 19.98, -8.06, 14.71, 10.53, 39.86],
-]
-
 REQUESTED = [
-    "Next50", "IT", "Infra", "Consumption", "Energy", "Healthcare", "Pharma",
+    "Nifty50", "Next50", "IT", "Infra", "Consumption", "Energy", "Healthcare", "Pharma",
     "Auto", "Alpha50", "FMCG", "Metal", "BankNifty", "PSUBanks", "PrivateBank",
     "SmallCap50", "SmallCap100", "SmallCap250", "Midcap50", "Midcap100",
     "Midcap150", "Nifty200 Momentum30", "Realty", "Commodities", "Oil and gas", "CPSE",
@@ -64,6 +39,7 @@ SYMBOLS = {
 }
 
 TRENDLYNE_IDS = {
+    "Nifty50": 1887,
     "Next50": 1888,
     "IT": 1902,
     "Infra": 1911,
@@ -215,14 +191,8 @@ def previous_rows():
 
 def main():
     saved = previous_rows()
-    csv_rows = [["Index", "Year", "Q1", "Q2", "Q3", "Q4", "Annual Returns"]]
-    for row in NIFTY50:
-        csv_rows.append(["Nifty50", *row])
-    pd.DataFrame(csv_rows[1:], columns=csv_rows[0]).to_csv(CSV_PATH, index=False)
-
     workbook = Workbook()
     workbook.remove(workbook.active)
-    write_sheet(workbook, "Nifty50", NIFTY50, "Source: supplied Trendlyne screenshot; pattern column omitted.")
     for name in REQUESTED:
         if name in TRENDLYNE_IDS:
             try:
@@ -240,6 +210,8 @@ def main():
         else:
             rows = []
             note = "No reliable public symbol mapping was found; no values were fabricated."
+        if name == "Nifty50":
+            pd.DataFrame([[name, *row] for row in rows], columns=["Index", "Year", "Q1", "Q2", "Q3", "Q4", "Annual Returns"]).to_csv(CSV_PATH, index=False)
         write_sheet(workbook, name, rows, note)
     add_cagr(workbook)
     workbook.save(XLSX_PATH)
