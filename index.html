@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Indian Sector Returns</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+  <aside id="sidebar">
+    <div class="brand">Indian<span>Sectors</span></div>
+    <button id="summaryBtn" class="nav summary">Summary</button>
+    <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
+    <div id="assetList"></div>
+    <div class="foot" id="foot"></div>
+  </aside>
+
+  <main>
+    <section id="assetView" hidden>
+      <h1 id="assetTitle"></h1>
+      <div class="chips" id="assetStats"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2>Quarterly returns</h2>
+          <div class="toolbar" data-chart="asset">
+            <button data-act="in" title="Zoom in (+)">+</button>
+            <button data-act="out" title="Zoom out (-)">&minus;</button>
+            <button data-act="fit" title="Fit to view (F)">Fit</button>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div id="assetChart" class="chart"></div>
+          <div id="assetTip" class="tip" hidden></div>
+        </div>
+        <p class="hint">Scroll to zoom &middot; drag to pan &middot; drag the axes to stretch &middot; double-click to fit</p>
+      </div>
+      <div class="card">
+        <h2>Returns table</h2>
+        <div class="table-wrap"><table id="assetTable" class="grid"></table></div>
+      </div>
+    </section>
+
+    <section id="summaryView" hidden>
+      <h1>Summary</h1>
+      <div class="card">
+        <div class="card-head">
+          <h2>Annual returns &mdash; all assets</h2>
+          <div class="toolbar" data-chart="summary">
+            <button data-act="all">All</button>
+            <button data-act="none">None</button>
+            <button data-act="in" title="Zoom in (+)">+</button>
+            <button data-act="out" title="Zoom out (-)">&minus;</button>
+            <button data-act="fit" title="Fit to view (F)">Fit</button>
+          </div>
+        </div>
+        <div class="summary-chart">
+          <div class="chart-wrap"><div id="summaryChart" class="chart tall"></div></div>
+          <div id="legend" class="legend"></div>
+        </div>
+        <p class="hint">Hover a legend item to highlight &middot; click to show/hide &middot; scroll to zoom &middot; drag to pan</p>
+      </div>
+      <div class="card" id="summaryText"></div>
+      <div class="card">
+        <h2>Annual heatmap</h2>
+        <div class="table-wrap"><table id="heatmap" class="grid heat"></table></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

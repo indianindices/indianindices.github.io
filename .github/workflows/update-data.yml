@@ -1,0 +1,77 @@
+name: Refresh data and deploy
+
+on:
+  schedule:
+    - cron: "30 1 3 * *" # 3rd of every month, 07:00 IST (picks up each quarter close)
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GitHub disables cron workflows after 60 days of repo inactivity; re-enabling resets that timer.
+      - name: Keep schedule alive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-data.yml/enable"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Snapshot current data
+        run: python export_data.py && cp data.json /tmp/old.json
+
+      - name: Fetch latest returns
+        run: python build_sectoraldata.py
+
+      - name: Export JSON for the website
+        run: python export_data.py
+
+      - name: Commit refreshed workbook if numbers changed
+        run: |
+          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(o['assets']==n['assets'])"; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add sectoraldata.xlsx
+            git commit -m "Refresh sector data $(date -u +%F)"
+            git push
+          else
+            echo "No data changes"
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      - name: Stage site files
+        run: mkdir _site && cp index.html app.js style.css data.json _site/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

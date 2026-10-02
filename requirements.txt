@@ -1,0 +1,4 @@
+pandas>=2.1
+requests>=2.31
+yfinance>=0.2
+openpyxl>=3.1

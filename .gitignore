@@ -1,0 +1,27 @@
+data.json
+./web/data.json
+web/data.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+*.csv
+*.parquet
+*.duckdb
+*.db
+
+# OS
+.DS_Store
