@@ -200,7 +200,21 @@ def add_cagr(workbook):
         sheet.column_dimensions["G"].width = 25
 
 
+def previous_rows():
+    if not XLSX_PATH.exists():
+        return {}
+    saved = {}
+    for sheet in load_workbook(XLSX_PATH, read_only=True).worksheets:
+        saved[sheet.title] = [
+            [label, *[round(value * 100, 4) if isinstance(value, (int, float)) else value for value in values]]
+            for label, *values in sheet.iter_rows(min_row=2, max_col=6, values_only=True)
+            if label == "5Yr Avg" or isinstance(label, int)
+        ]
+    return saved
+
+
 def main():
+    saved = previous_rows()
     csv_rows = [["Index", "Year", "Q1", "Q2", "Q3", "Q4", "Annual Returns"]]
     for row in NIFTY50:
         csv_rows.append(["Nifty50", *row])
@@ -219,6 +233,10 @@ def main():
             except Exception as error:
                 rows = []
                 note = f"Trendlyne data unavailable for index ID {TRENDLYNE_IDS[name]}: {error}"
+            if not rows and saved.get(name):
+                print(f"{name}: fetch failed ({note}); keeping previous data", flush=True)
+                rows = saved[name]
+                note = f"Source: Trendlyne index ID {TRENDLYNE_IDS[name]}; last refresh failed, showing previously saved data."
         else:
             rows = []
             note = "No reliable public symbol mapping was found; no values were fabricated."

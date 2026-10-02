@@ -25,6 +25,7 @@ jobs:
 
       # GitHub disables cron workflows after 60 days of repo inactivity; re-enabling resets that timer.
       - name: Keep schedule alive
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/update-data.yml/enable"
@@ -46,6 +47,7 @@ jobs:
         run: python export_data.py
 
       - name: Commit refreshed workbook if numbers changed
+        continue-on-error: true
         run: |
           if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(o['assets']==n['assets'])"; then
             git config user.name "github-actions[bot]"
