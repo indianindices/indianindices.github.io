@@ -46,17 +46,17 @@ jobs:
       - name: Export JSON for the website
         run: python export_data.py
 
-      - name: Commit refreshed workbook if numbers changed
+      - name: Commit refreshed workbook if data or refresh status changed
         continue-on-error: true
         run: |
-          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(o['assets']==n['assets'])"; then
+          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(o['assets']==n['assets'] and o.get('refresh')==n.get('refresh'))"; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add sectoraldata.xlsx
             git commit -m "Refresh sector data $(date -u +%F)"
             git push
           else
-            echo "No data changes"
+            echo "No data or refresh status changes"
           fi
 
       - uses: actions/configure-pages@v5
@@ -65,7 +65,7 @@ jobs:
         run: |
           mkdir -p _site/docs
           cp index.html app.js style.css data.json _site/
-          cp docs/github.svg _site/docs/
+          cp docs/github.svg docs/download.svg docs/plus.svg docs/minus.svg docs/maximize.svg _site/docs/
 
       - uses: actions/upload-pages-artifact@v3
         with:

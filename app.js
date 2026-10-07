@@ -1,7 +1,7 @@
 const LC = LightweightCharts;
 const QEND = [[3, 31], [6, 30], [9, 30], [12, 31]];
 const $ = (s) => document.querySelector(s);
-const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", compareNames: [], compareMode: "returns", fromYear: null, toYear: null };
+const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", compareNames: [], compareMode: "returns", fromYear: null, toYear: null, rankingSort: { key: "cagr5", direction: "desc" } };
 
 const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`);
 const cls = (v) => (v == null ? "" : v >= 0 ? "pos" : "neg");
@@ -134,12 +134,31 @@ function ensureAssetChart() {
   return state.charts.asset;
 }
 
+function refreshInfo(name, now = Date.now()) {
+  const record = state.data.refresh?.[name];
+  const success = record?.lastSuccess && Number.isFinite(Date.parse(record.lastSuccess)) ? record.lastSuccess : null;
+  const detail = `Last successful refresh ${success ?? "unknown"} · last attempt ${record?.lastAttempt ?? "unknown"}`;
+  if (record?.status === "cached") return { kind: "cached", label: "Cached data after failed refresh", detail };
+  if (record?.status === "unavailable") return { kind: "unavailable", label: "Source unavailable", detail };
+  if (!success || record?.status !== "fresh") return { kind: "unknown", label: "Refresh date unknown", detail };
+  if ((now - Date.parse(success)) / 86400000 > 45) return { kind: "stale", label: "Refresh over 45 days old", detail };
+  return { kind: "fresh", label: `Refreshed ${success}`, detail };
+}
+
+function refreshDot(name) {
+  const info = refreshInfo(name);
+  return `<span class="refresh-dot ${info.kind}" role="img" aria-label="${esc(info.label)}" title="${esc(`${info.label} · ${info.detail}`)}"></span>`;
+}
+
 function renderAsset(name, keepZoom = false) {
   const rows = state.data.assets[name];
   const displayed = rows.filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear);
   const s = state.stats[name];
   const cy = state.data.currentYear;
   $("#assetTitle").textContent = name;
+  const freshness = refreshInfo(name);
+  $("#assetFreshness").className = `index-freshness ${freshness.kind}`;
+  $("#assetFreshness").textContent = `${freshness.label} · ${freshness.detail}`;
 
   const chip = (label, v, note = "") => `<div class="chip"><small>${label}</small><strong class="${cls(v)}">${fmt(v)}</strong>${note ? `<em>${note}</em>` : ""}</div>`;
   $("#assetStats").innerHTML = [
@@ -169,6 +188,7 @@ function renderAsset(name, keepZoom = false) {
     .filter(Boolean)
     .sort((a, b) => a.time.year - b.time.year || a.time.month - b.time.month);
   series.setData(points);
+  $("#assetView [data-act='png']").disabled = !points.length;
   if (!keepZoom) requestAnimationFrame(() => fit(chart));
 
   const annualByYear = Object.fromEntries(rows.filter((r) => !r.avg).map((r) => [r.year, r.annual]));
@@ -193,6 +213,7 @@ function renderAsset(name, keepZoom = false) {
 }
 
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+const fmtPp = (value) => value == null ? "—" : `${value > 0 ? "+" : ""}${value.toFixed(2)} pp`;
 const quarterTime = (key) => ({ year: Math.floor(key / 4), month: QEND[key % 4][0], day: QEND[key % 4][1] });
 const quarterLabel = (key) => `Q${key % 4 + 1} ${Math.floor(key / 4)}`;
 
@@ -217,6 +238,57 @@ function growthData(names, fromYear = -Infinity, toYear = Infinity) {
   return { start, end, series };
 }
 
+function riskData(compounded) {
+  if (!compounded) return null;
+  return compounded.series.map((points) => {
+    let peak = points[0].value, peakIndex = 0, longest = 0, previousDuration = 0, worst = null;
+    const drawdown = [], recovery = [];
+    points.forEach((point, index) => {
+      const recovered = point.value >= peak * (1 - 1e-12);
+      const duration = recovered ? 0 : index - peakIndex;
+      longest = Math.max(longest, duration, recovered && previousDuration ? index - peakIndex : 0);
+      if (recovered) {
+        if (worst && worst.peakIndex === peakIndex && worst.recoveredIndex == null) worst.recoveredIndex = index;
+        peak = Math.max(peak, point.value);
+        peakIndex = index;
+      }
+      const value = recovered ? 0 : (point.value / peak - 1) * 100;
+      if (value < (worst?.value ?? 0)) worst = { value, peakIndex, trough: point.time, recoveredIndex: null };
+      drawdown.push({ time: point.time, value });
+      recovery.push({ time: point.time, value: duration });
+      previousDuration = duration;
+    });
+    return { drawdown, recovery, worst, longest, current: drawdown[drawdown.length - 1].value,
+      worstRecovery: worst?.recoveredIndex == null ? null : worst.recoveredIndex - worst.peakIndex };
+  });
+}
+
+function annualCompareData(name, excess = false) {
+  const benchmark = new Map((state.data.assets.Nifty50 ?? []).filter((row) => !row.avg).map((row) => [row.year, row.annual]));
+  return state.data.assets[name].filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
+    .sort((left, right) => left.year - right.year).map((row) => {
+      const reference = benchmark.get(row.year);
+      const value = Number.isFinite(row.annual) && (!excess || Number.isFinite(reference)) ? row.annual - (excess ? reference : 0) : null;
+      return { time: { year: row.year, month: 12, day: 31 }, ...(value == null ? {} : { value }) };
+    });
+}
+
+function rollingCompareData(name, years) {
+  const quarterly = new Map(state.data.assets[name].filter((row) => !row.avg)
+    .flatMap((row) => row.q.map((value, index) => [row.year * 4 + index, value])));
+  const last = Math.max(...[...quarterly].filter(([, value]) => Number.isFinite(value)).map(([key]) => key));
+  return [...quarterly.keys()].filter((key) => key <= last && Math.floor(key / 4) >= state.fromYear && Math.floor(key / 4) <= state.toYear)
+    .sort((left, right) => left - right).map((end) => {
+      let product = 1;
+      for (let key = end - 4 * years + 1; key <= end; key++) {
+        const value = quarterly.get(key);
+        if (!Number.isFinite(value)) return { time: quarterTime(end) };
+        product *= 1 + value / 100;
+      }
+      return { time: quarterTime(end), value: (product ** (1 / years) - 1) * 100 };
+    });
+}
+
 function ensureCompareChart() {
   if (state.charts.compare) return state.charts.compare;
   const chart = LC.createChart($("#compareChart"), baseOptions({
@@ -229,10 +301,12 @@ function ensureCompareChart() {
     if (!event.time || !event.point) return (tip.hidden = true);
     const values = entry.lines.flatMap((line) => {
       const point = event.seriesData.get(line.series);
-      return point?.value == null ? [] : [`<div><span>${esc(line.name)}</span><b class="${state.compareMode === "growth" ? "" : cls(point.value)}">${state.compareMode === "growth" ? money(point.value) : fmt(point.value)}</b></div>`];
+      const duration = state.compareMode === "recovery";
+      return point?.value == null ? [] : [`<div><span>${esc(line.name)}</span><b class="${state.compareMode === "growth" || duration ? "" : cls(point.value)}">${duration ? `${point.value} quarters` : state.compareMode === "growth" ? money(point.value) : state.compareMode === "excess" ? fmtPp(point.value) : fmt(point.value)}</b></div>`];
     });
     tip.hidden = !values.length;
-    tip.innerHTML = `${chart.options().localization.timeFormatter(event.time)}${values.join("")}`;
+    const unit = state.compareMode === "excess" ? '<div class="tip-unit">Excess return<br>(percentage points)</div>' : "";
+    tip.innerHTML = `${chart.options().localization.timeFormatter(event.time)}${unit}${values.join("")}`;
     tip.style.left = `${Math.max(0, Math.min(event.point.x + 12, $("#compareChart").clientWidth - Math.ceil(tip.getBoundingClientRect().width)))}px`;
     tip.style.top = "8px";
   });
@@ -246,32 +320,94 @@ function renderCompare() {
   entry.lines.forEach((line) => entry.chart.removeSeries(line.series));
   entry.lines = [];
   $("#compareTip").hidden = true;
+  $("#shareStatus").textContent = "";
+  $("#shareFallback").hidden = true;
   const growth = state.compareMode === "growth";
+  const risk = state.compareMode === "drawdown" || state.compareMode === "recovery";
+  const duration = state.compareMode === "recovery";
+  const excess = state.compareMode === "excess";
+  const rollingYears = state.compareMode === "rolling3" ? 3 : state.compareMode === "rolling5" ? 5 : null;
   const selected = state.names.filter((name) => state.compareNames.includes(name));
-  const compounded = growth ? growthData(selected, state.fromYear, state.toYear) : null;
-  const formatter = growth ? money : (value) => `${value.toFixed(2)}%`;
+  const compounded = growth || risk ? growthData(selected, state.fromYear, state.toYear) : null;
+  const risks = risk ? riskData(compounded) : null;
+  const formatter = duration ? (value) => `${Math.round(value)}q` : growth ? money : excess ? fmtPp : (value) => `${value.toFixed(2)}%`;
   document.querySelectorAll("#compareMode button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === state.compareMode)));
   entry.chart.applyOptions({
     timeScale: { tickMarkFormatter: (time) => String(yearOf(time)) },
-    localization: { priceFormatter: formatter, timeFormatter: (time) => growth ? `${yearOf(time)} Q${Math.ceil(monthOf(time) / 3)}` : `${yearOf(time)}${yearOf(time) === state.data.currentYear ? " YTD" : ""}` },
+    localization: { priceFormatter: formatter, timeFormatter: (time) => growth || risk || rollingYears ? `${yearOf(time)} Q${Math.ceil(monthOf(time) / 3)}` : `${yearOf(time)}${yearOf(time) === state.data.currentYear ? " YTD" : ""}` },
   });
   state.names.forEach((name, index) => {
-    if (!selected.includes(name) || (growth && !compounded)) return;
+    if (!selected.includes(name) || ((growth || risk) && !compounded)) return;
     const series = entry.chart.addLineSeries({
       color: hsla((index * 137.508) % 360, 80, 62), lineWidth: name === "Nifty50" ? 3 : 2,
+      lineType: risk ? LC.LineType.Simple : LC.LineType.Curved,
       lineStyle: name === "Nifty50" ? LC.LineStyle.Dashed : LC.LineStyle.Solid,
       priceLineVisible: false, lastValueVisible: false,
-      priceFormat: { type: "custom", formatter },
+      priceFormat: { type: "custom", formatter, minMove: duration ? 1 : 0.01 },
     });
-    series.setData(growth ? compounded.series[selected.indexOf(name)] : state.data.assets[name].filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear).sort((left, right) => left.year - right.year)
-      .map((row) => ({ time: { year: row.year, month: 12, day: 31 }, ...(row.annual == null ? {} : { value: row.annual }) })));
+    series.setData(risk ? risks[selected.indexOf(name)][duration ? "recovery" : "drawdown"] : growth ? compounded.series[selected.indexOf(name)] : rollingYears ? rollingCompareData(name, rollingYears) : annualCompareData(name, excess));
+    if (excess && !entry.lines.length) series.createPriceLine({ price: 0, color: "rgba(255,255,255,0.3)", lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false });
     entry.lines.push({ name, series });
   });
-  $("#compareStatus").textContent = !selected.length ? "No indices selected" : growth
+  $("#compareStatus").textContent = !selected.length ? "No indices selected" : risk
+    ? compounded ? `Quarter-end observations, not daily · peak reset at end of ${quarterLabel(compounded.start - 1)} · through ${quarterLabel(compounded.end)}` : "No shared quarterly history"
+    : growth
     ? compounded ? `₹10,000 at end of ${quarterLabel(compounded.start - 1)} · through ${quarterLabel(compounded.end)} · common uninterrupted history` : "No shared quarterly history"
-    : `${selected.length} indices · ${state.data.currentYear} is YTD`;
-  $("#compareView .download-csv").disabled = !selected.length || (growth && !compounded);
+    : rollingYears ? `${rollingYears}Y annualized returns · consecutive ${rollingYears * 4}-quarter windows`
+      : excess ? `Nifty50 benchmark · annual difference in percentage points · ${state.data.currentYear} is YTD`
+      : `${selected.length} indices · ${state.data.currentYear} is YTD`;
+  const hasData = entry.lines.some((line) => line.series.data().some((point) => point.value != null));
+  if (selected.length && !hasData) $("#compareStatus").textContent = "No data for the selected metric and range";
+  $("#compareView [data-act='png']").disabled = !hasData;
+  $("#compareView .download-csv").disabled = !selected.length || ((growth || risk) && !compounded);
+  $("#riskDetails").hidden = !risk || !risks;
+  if (risks) {
+    $("#riskTable").innerHTML = '<thead><tr><th>Index</th><th>Max drawdown</th><th>Current drawdown</th><th>Longest underwater</th><th>Worst trough</th><th>Worst episode recovery</th></tr></thead><tbody>' + risks.map((record, index) => {
+      const trough = record.worst?.trough;
+      const recovery = !record.worst ? "No drawdown" : record.worstRecovery == null ? "Not recovered" : `${record.worstRecovery} quarters`;
+      return `<tr><td class="label">${esc(selected[index])}</td><td class="neg">${fmt(record.worst?.value ?? 0)}</td><td class="${cls(record.current)}">${fmt(record.current)}</td><td>${record.longest} quarters</td><td>${trough ? `${trough.year} Q${trough.month / 3}` : "—"}</td><td>${recovery}</td></tr>`;
+    }).join("") + "</tbody>";
+  }
+  if (state.view === "compare") history.replaceState(null, "", `#${compareHash()}`);
   requestAnimationFrame(() => fit(entry.chart));
+}
+
+function compareHash() {
+  const params = new URLSearchParams({ mode: state.compareMode, from: String(state.fromYear), to: String(state.toYear) });
+  const selected = state.names.filter((name) => state.compareNames.includes(name));
+  if (!selected.length) params.append("asset", "");
+  else selected.forEach((name) => params.append("asset", name));
+  return `compare?${params}`;
+}
+
+function applyCompareParams(params) {
+  if (params.has("mode")) state.compareMode = ["returns", "growth", "excess", "rolling3", "rolling5", "drawdown", "recovery"].includes(params.get("mode")) ? params.get("mode") : "returns";
+  if (params.has("asset")) state.compareNames = state.names.filter((name) => params.getAll("asset").includes(name));
+  const year = (key, fallback) => {
+    const value = params.get(key);
+    return value && /^\d{4}$/.test(value) ? Math.max(state.firstYear, Math.min(state.lastYear, Number(value))) : fallback;
+  };
+  state.fromYear = year("from", state.fromYear);
+  state.toYear = Math.max(state.fromYear, year("to", state.toYear));
+  document.querySelectorAll(".from-year").forEach((input) => (input.value = state.fromYear));
+  document.querySelectorAll(".to-year").forEach((input) => (input.value = state.toYear));
+  document.querySelectorAll("#compareChoices input").forEach((input) => (input.checked = state.compareNames.includes(input.dataset.name)));
+}
+
+async function copyCompareLink() {
+  const url = new URL(location.href);
+  url.hash = compareHash();
+  try {
+    await navigator.clipboard.writeText(url.href);
+    $("#shareStatus").textContent = "Link copied";
+    $("#shareFallback").hidden = true;
+  } catch {
+    $("#shareStatus").textContent = "Clipboard unavailable";
+    $("#shareFallback").hidden = false;
+    $("#shareLink").value = url.href;
+    $("#shareLink").focus();
+    $("#shareLink").select();
+  }
 }
 
 function csvText(records) {
@@ -289,24 +425,128 @@ function exportRecords() {
         .map((row) => [state.asset, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", ...row.q, row.annual])];
   }
   const selected = state.names.filter((name) => state.compareNames.includes(name));
+  if (state.compareMode === "drawdown" || state.compareMode === "recovery") {
+    const risks = riskData(growthData(selected, state.fromYear, state.toYear));
+    const duration = state.compareMode === "recovery";
+    return [["Index", "Quarter end", duration ? "Quarters below peak" : "Quarter-end drawdown (%)"], ...(risks ? selected.flatMap((name, index) => risks[index][duration ? "recovery" : "drawdown"]
+      .map((point) => [name, `${point.time.year}-${String(point.time.month).padStart(2, "0")}-${String(point.time.day).padStart(2, "0")}`, point.value])) : [])];
+  }
+  if (state.compareMode === "rolling3" || state.compareMode === "rolling5") {
+    const years = state.compareMode === "rolling3" ? 3 : 5;
+    return [["Index", "Quarter end", `${years}Y rolling CAGR (%)`], ...selected.flatMap((name) => rollingCompareData(name, years)
+      .map((point) => [name, `${point.time.year}-${String(point.time.month).padStart(2, "0")}-${String(point.time.day).padStart(2, "0")}`, point.value ?? null]))];
+  }
   if (state.compareMode === "growth") {
     const compounded = growthData(selected, state.fromYear, state.toYear);
     return [["Index", "Date", "Investment value (INR)"], ...(compounded ? selected.flatMap((name, index) => compounded.series[index].map((point) => [name,
       `${point.time.year}-${String(point.time.month).padStart(2, "0")}-${String(point.time.day).padStart(2, "0")}`, Number(point.value.toFixed(2))])) : [])];
   }
-  return [["Index", "Year", "Period", "Annual return (%)"], ...selected.flatMap((name) => state.data.assets[name]
-    .filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
-    .map((row) => [name, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", row.annual]))];
+  return [["Index", "Year", "Period", state.compareMode === "excess" ? "Excess vs Nifty50 (percentage points)" : "Annual return (%)"], ...selected.flatMap((name) => annualCompareData(name, state.compareMode === "excess")
+    .map((point) => [name, point.time.year, point.time.year === state.data.currentYear ? "YTD" : "Full year", point.value ?? null]))];
+}
+
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function downloadCsv() {
-  const url = URL.createObjectURL(new Blob(["\uFEFF", csvText(exportRecords())], { type: "text/csv;charset=utf-8" }));
-  const link = document.createElement("a");
-  link.href = url;
   const name = state.view === "asset" ? state.asset : `comparison-${state.compareMode}`;
-  link.download = `${name.replace(/[^a-z0-9_-]/gi, "_")}-${state.fromYear}-${state.toYear}.csv`;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveBlob(new Blob(["\uFEFF", csvText(exportRecords())], { type: "text/csv;charset=utf-8" }), `${name.replace(/[^a-z0-9_-]/gi, "_")}-${state.fromYear}-${state.toYear}.csv`);
+}
+
+function chartExportInfo(view) {
+  const titles = { returns: "Annual returns", growth: "Growth of ₹10,000", excess: "Excess vs Nifty50 (percentage points)", rolling3: "3Y rolling CAGR", rolling5: "5Y rolling CAGR", drawdown: "Quarter-end drawdown", recovery: "Recovery (quarters)" };
+  let title = view === "asset" ? `${state.asset} · ${state.returnPeriod} returns` : view === "summary" ? "Annual returns · all indices" : titles[state.compareMode];
+  const subtitle = view === "summary" ? `${state.firstYear}–${state.lastYear} · ${state.data.currentYear} is YTD` : view === "compare" ? $("#compareStatus").textContent : `${state.fromYear}–${state.toYear} · ${state.data.currentYear} is YTD`;
+  const lines = (state.charts[view]?.lines ?? []).filter((line) => line.visible !== false).map((line) => ({ name: line.name, color: line.series.options().color }));
+  if (view === "summary" && lines.length !== state.names.length) title = `Annual returns · ${lines.length} visible ${lines.length === 1 ? "index" : "indices"}`;
+  const name = view === "asset" ? `${state.asset}-${state.returnPeriod}` : view === "compare" ? `compare-${state.compareMode}` : "summary";
+  return { title, subtitle, lines, filename: `indian-sectors-${name.replace(/[^a-z0-9_-]/gi, "_")}-${state.data.generated}.png` };
+}
+
+function createChartPng(view, info = chartExportInfo(view)) {
+  const snapshot = state.charts[view].chart.takeScreenshot();
+  if (!snapshot.width || !snapshot.height) throw new Error("Chart is not ready");
+  const scale = snapshot.width / $("#" + view + "Chart").clientWidth;
+  const padding = 16 * scale;
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const font = (size) => `${size * scale}px Inter, system-ui, sans-serif`;
+  const wrap = (text) => {
+    const lines = [];
+    let line = "";
+    String(text).split(/\s+/).forEach((word) => {
+      const next = line ? `${line} ${word}` : word;
+      if (line && context.measureText(next).width > snapshot.width) { lines.push(line); line = word; }
+      else line = next;
+    });
+    if (line) lines.push(line);
+    return lines;
+  };
+  context.font = font(18);
+  const title = wrap(info.title);
+  context.font = font(11);
+  const subtitle = wrap(`${info.subtitle} · visible chart viewport · data exported ${state.data.generated}`);
+  const footer = wrap("Source: Trendlyne · Past performance does not predict future returns.");
+  const headerHeight = padding + 30 * scale + title.length * 24 * scale + subtitle.length * 16 * scale + 12 * scale;
+  const columns = snapshot.width >= 640 * scale ? 2 : 1;
+  const legendHeight = Math.ceil(info.lines.length / columns) * 22 * scale;
+  canvas.width = Math.ceil(snapshot.width + padding * 2);
+  canvas.height = Math.ceil(headerHeight + snapshot.height + padding * 2 + legendHeight + footer.length * 16 * scale);
+  context.fillStyle = "#0b0f17";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.textBaseline = "top";
+  context.font = font(14);
+  context.fillStyle = "#22d3ee";
+  context.fillText("Indian Sectors", padding, padding);
+  context.font = font(18);
+  context.fillStyle = "#e6eaf2";
+  title.forEach((line, index) => context.fillText(line, padding, padding + (30 + index * 24) * scale));
+  context.font = font(11);
+  context.fillStyle = "#9aa4b2";
+  subtitle.forEach((line, index) => context.fillText(line, padding, padding + (30 + title.length * 24 + index * 16) * scale));
+  context.drawImage(snapshot, padding, headerHeight);
+  const legendTop = headerHeight + snapshot.height + padding;
+  context.font = font(12);
+  info.lines.forEach((line, index) => {
+    const columnWidth = snapshot.width / columns;
+    const left = padding + (index % columns) * columnWidth;
+    const top = legendTop + Math.floor(index / columns) * 22 * scale;
+    context.fillStyle = line.color;
+    context.fillRect(left, top + 3 * scale, 8 * scale, 8 * scale);
+    context.fillStyle = "#e6eaf2";
+    let label = line.name;
+    while (context.measureText(label).width > columnWidth - 22 * scale && label.length > 1) label = label.slice(0, -1);
+    context.fillText(label === line.name ? label : `${label.slice(0, -3)}...`, left + 16 * scale, top);
+  });
+  context.font = font(11);
+  context.fillStyle = "#9aa4b2";
+  footer.forEach((line, index) => context.fillText(line, padding, legendTop + legendHeight + index * 16 * scale));
+  return new Promise((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG encoding failed")), "image/png"));
+}
+
+async function downloadChartPng(view) {
+  const button = $(`[data-chart="${view}"] [data-act="png"]`);
+  const status = $(`[data-export-status="${view}"]`);
+  button.disabled = true;
+  status.textContent = "Preparing PNG...";
+  try {
+    const info = chartExportInfo(view);
+    const blob = await createChartPng(view, info);
+    saveBlob(blob, info.filename);
+    status.textContent = "PNG export ready";
+  } catch {
+    status.textContent = "PNG export failed";
+  } finally {
+    button.disabled = view === "compare" ? !state.charts.compare.lines.some((line) => line.series.data().some((point) => point.value != null)) : view === "asset" ? !state.charts.asset.series.data().length : false;
+  }
 }
 
 // ---------- summary view ----------
@@ -381,6 +621,37 @@ function renderSummary() {
   requestAnimationFrame(() => fit(chart));
   renderSummaryText();
   renderHeatmap();
+  renderRankings();
+}
+
+function rankedNames(key = state.rankingSort.key, direction = state.rankingSort.direction) {
+  const sign = direction === "asc" ? 1 : -1;
+  return [...state.names].sort((left, right) => {
+    if (key === "name") return sign * left.localeCompare(right);
+    const leftValue = state.stats[left][key], rightValue = state.stats[right][key];
+    const leftMissing = !Number.isFinite(leftValue), rightMissing = !Number.isFinite(rightValue);
+    if (leftMissing !== rightMissing) return leftMissing ? 1 : -1;
+    return (!leftMissing ? sign * (leftValue - rightValue) : 0) || left.localeCompare(right);
+  });
+}
+
+function renderRankings() {
+  const columns = [
+    ["name", "Index"], ["ytd", `${state.data.currentYear} YTD`], ["last", String(state.data.currentYear - 1)],
+    ["cagr3", "3Y CAGR"], ["cagr5", "5Y CAGR"], ["cagr10", "10Y CAGR"], ["sd", "Volatility"], ["win", "Up years"],
+  ];
+  const head = columns.map(([key, label]) => {
+    const active = state.rankingSort.key === key;
+    const sort = active ? state.rankingSort.direction === "asc" ? "ascending" : "descending" : "none";
+    const arrow = active ? state.rankingSort.direction === "asc" ? "&#8593;" : "&#8595;" : "&nbsp;";
+    return `<th scope="col" aria-sort="${sort}"><button type="button" class="ranking-sort" data-sort="${key}" aria-label="Sort by ${label}">${label}<span aria-hidden="true">${arrow}</span></button></th>`;
+  }).join("");
+  const body = rankedNames().map((name) => `<tr><td class="label"><a href="#asset/${encodeURIComponent(name)}">${esc(name)}</a></td>${columns.slice(1).map(([key]) => {
+    const value = state.stats[name][key];
+    const unsigned = key === "sd" || key === "win";
+    return `<td class="${unsigned ? "" : cls(value)}">${unsigned ? value == null ? "—" : `${value.toFixed(1)}%` : fmt(value)}</td>`;
+  }).join("")}</tr>`).join("");
+  $("#rankings").innerHTML = `<thead><tr>${head}</tr></thead><tbody>${body}</tbody>`;
 }
 
 function renderHeatmap() {
@@ -452,14 +723,19 @@ function renderSidebar() {
     .map((n) => {
       const s = shade(state.stats[n].ytd, 30);
       const badge = s ? `<span class="badge" style="background:${s.bg};color:${s.fg}">${fmt(state.stats[n].ytd, 1)}</span>` : "";
-      return `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span>${badge}</button>`;
+      return `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span><span class="nav-meta">${refreshDot(n)}${badge}</span></button>`;
     }).join("");
   $("#summaryBtn").classList.toggle("active", state.view === "summary");
   $("#compareBtn").classList.toggle("active", state.view === "compare");
 }
 
 function route() {
-  const hash = decodeURIComponent(location.hash.slice(1));
+  const raw = location.hash.slice(1);
+  const separator = raw.indexOf("?");
+  const path = separator < 0 ? raw : raw.slice(0, separator);
+  let hash;
+  try { hash = decodeURIComponent(path); } catch { hash = ""; }
+  const params = new URLSearchParams(separator < 0 ? "" : raw.slice(separator + 1));
   const name = hash.startsWith("asset/") ? hash.slice(6) : null;
   $("#compareView").hidden = hash !== "compare";
   if (name && state.data.assets[name]) {
@@ -470,6 +746,7 @@ function route() {
     renderAsset(name);
   } else if (hash === "compare") {
     state.view = "compare";
+    applyCompareParams(params);
     $("#assetView").hidden = true;
     $("#summaryView").hidden = true;
     renderCompare();
@@ -491,6 +768,13 @@ function activeChart() {
 }
 
 function bindUI() {
+  $("#rankings").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-sort]");
+    if (!button) return;
+    const key = button.dataset.sort;
+    state.rankingSort = { key, direction: state.rankingSort.key === key ? state.rankingSort.direction === "asc" ? "desc" : "asc" : key === "sd" || key === "name" ? "asc" : "desc" };
+    renderRankings();
+  });
   document.querySelectorAll(".range-controls select").forEach((select) => select.addEventListener("change", () => {
     if (select.classList.contains("from-year")) {
       state.fromYear = +select.value;
@@ -506,7 +790,8 @@ function bindUI() {
   }));
   document.querySelectorAll(".download-csv").forEach((button) => button.addEventListener("click", downloadCsv));
   $("#summaryBtn").addEventListener("click", () => (location.hash = "summary"));
-  $("#compareBtn").addEventListener("click", () => (location.hash = "compare"));
+  $("#compareBtn").addEventListener("click", () => (location.hash = compareHash()));
+  $("#copyCompareLink").addEventListener("click", copyCompareLink);
   $("#compareMode").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-mode]");
     if (!button || button.dataset.mode === state.compareMode) return;
@@ -540,9 +825,10 @@ function bindUI() {
     renderAsset(state.asset, true);
   });
   document.querySelectorAll(".toolbar").forEach((bar) => bar.addEventListener("click", (e) => {
-    const act = e.target.dataset.act;
+    const act = e.target.closest("button[data-act]")?.dataset.act;
     const c = state.charts[bar.dataset.chart];
     if (!act || !c) return;
+    if (act === "png") { downloadChartPng(bar.dataset.chart); return; }
     if (act === "in") zoom(c.chart, 0.7);
     if (act === "out") zoom(c.chart, 1.4);
     if (act === "fit") fit(c.chart);
@@ -580,12 +866,16 @@ async function init() {
     select.value = select.classList.contains("from-year") ? state.fromYear : state.toYear;
   });
   state.compareNames = state.names.filter((name, index) => name === "Nifty50" || index === 1);
-  $("#compareChoices").innerHTML = "<legend>Indices</legend>" + state.names.map((name, index) => `<label><input type="checkbox" data-name="${esc(name)}" ${state.compareNames.includes(name) ? "checked" : ""}><span class="dot" style="background:${hsla((index * 137.508) % 360, 80, 62)}"></span>${esc(name)}</label>`).join("");
+  $("#compareChoices").innerHTML = "<legend>Indices</legend>" + state.names.map((name, index) => `<label><input type="checkbox" data-name="${esc(name)}" ${state.compareNames.includes(name) ? "checked" : ""}><span class="dot" style="background:${hsla((index * 137.508) % 360, 80, 62)}"></span><span class="choice-name">${esc(name)}</span>${refreshDot(name)}</label>`).join("");
   const lastQ = Math.max(...state.names.flatMap((n) => state.data.assets[n].filter((r) => !r.avg).flatMap((r) => r.q.map((v, i) => (v == null ? -1 : r.year * 4 + i)))));
   state.asOf = `Q${(lastQ % 4) + 1} ${Math.floor(lastQ / 4)}`;
   const ageDays = (Date.now() - Date.parse(state.data.generated)) / 86400000;
   $("#freshness").textContent = `Data exported ${state.data.generated} · latest available quarter ${state.asOf}${ageDays > 45 ? " · export over 45 days old" : ""}`;
-  $("#freshness").classList.toggle("stale", ageDays > 45);
+  const warnings = state.names.filter((name) => ["cached", "stale", "unavailable"].includes(refreshInfo(name).kind)).length;
+  const unknown = state.names.filter((name) => refreshInfo(name).kind === "unknown").length;
+  if (warnings) $("#freshness").textContent += ` · ${warnings} indices need refresh attention`;
+  if (unknown) $("#freshness").textContent += ` · ${unknown} refresh dates unknown`;
+  $("#freshness").classList.toggle("stale", ageDays > 45 || warnings > 0);
   state.names.forEach((n) => (state.stats[n] = computeStats(state.data.assets[n])));
   $("#foot").textContent = `Data exported ${state.data.generated}`;
   bindUI();

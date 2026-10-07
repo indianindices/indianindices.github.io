@@ -1,118 +1,256 @@
 # Indian Sectors
 
-**Quarterly and annual returns for 26 Indian market indices (Nifty50, sectoral, mid/small-cap and thematic), all in one interactive dashboard.**
+<p align="center">
+  <img src="docs/brand.gif" alt="Indian Sectors: a mint bull and coral bear with gently animated market candles" width="1200">
+</p>
 
-### 👉 [Open the live site: indianindices.github.io](https://indianindices.github.io/)
+<p align="center"><strong>Read the cycle. Compare the risk.</strong><br>
+Learn sector rotation through Indian market returns, comparisons, and risk analysis.</p>
 
-![Indian Sectors demo](docs/demo.gif)
+<p align="center">
+  <a href="https://indianindices.github.io/">Open dashboard</a> &middot;
+  <a href="https://indianindices.github.io/#compare">Compare Sectors</a> &middot;
+  <a href="https://indianindices.github.io/#summary">Market summary</a> &middot;
+  <a href="CONTRIBUTING.md">Contribute</a>
+</p>
 
-The data refreshes automatically every month, so there's nothing to install. Just open the link.
+[![Refresh and deploy](https://github.com/indianindices/indianindices.github.io/actions/workflows/update-data.yml/badge.svg)](https://github.com/indianindices/indianindices.github.io/actions/workflows/update-data.yml)
 
----
+**26 Indian indices. Seven comparison modes. Historical returns and transparent risk metrics.**
+Explore Nifty50, sectoral, mid/small-cap and thematic indices in a browser.
+No account or installation is needed to use the published dashboard.
 
-## Using the site
+[Static banner](docs/brand.png) · [Dashboard](#dashboard) · [Comparison modes](#comparison-modes) · [Data and year rollover](#data-and-year-rollover) · [Methodology](#methodology) · [Local setup](#local-setup)
 
-### Asset pages
-Pick any index from the sidebar (or type in **Search assets**). The coloured badge next to each name is its return so far this year.
+> A research and learning tool, not a trading forecast or investment recommendation.
 
-![Asset view](docs/asset.png)
+## Dashboard
 
-- **Stat tiles**: this year's return so far (YTD), last year, the 3Y / 5Y / 10Y CAGR up to the last completed quarter, best and worst year, the share of years that ended positive, and volatility.
-- **Returns chart**: starts with one bar per quarter. Click **Annual returns** for one bar per calendar year, or **Quarterly returns** to switch back. The current year's annual bar is labelled **YTD**. Deep green bars are very strong returns and deep red bars are very weak ones.
-- **From / To**: choose a calendar-year range for the chart and returns table. Stat tiles keep their full-history definitions. **Download CSV** exports returns in the selected range; missing values are blank.
-- **Returns table**: every year and quarter, colour-graded from dark red (very bad) through pale tones to dark green (very good).
-  - Click the **5Y CAGR** header to switch between **3Y / 5Y / 10Y CAGR**.
-  - Rows for past years show the calendar-year CAGR ending that year. The current-year row shows the **trailing** CAGR up to the last completed quarter, comparable to what Screener and similar sites report.
-  - Unfinished quarters show as "—".
+![Current comparison dashboard with controls inside the graph](docs/compare.png)
+
+### Compare Sectors
+
+The first navigation button opens the comparison workspace. Nifty50 and Next50
+are selected initially; Nifty50 has a dashed line. Select individual indices
+with checkboxes, or use **All / None**. Subtle button colours identify each metric.
+
+**From / To** selects calendar years. The range is shared with asset pages,
+but does not filter Summary. **Copy link** preserves the metric, selected indices
+and years in the URL, including after reload. If clipboard access is unavailable,
+a selectable link field appears instead.
+
+### Individual indices
+
+Search the sidebar or select an index to open its page. Each page includes:
+
+- Quarterly and annual return histograms, with current-year annual values labelled **YTD**.
+- YTD, previous-year return, 3Y / 5Y / 10Y CAGR, best/worst year, up-year frequency and annual volatility.
+- A colour-graded returns table, with a **3Y / 5Y / 10Y CAGR** selector.
+- Year-range filters, CSV download and a detailed per-index refresh status.
+
+Missing or unfinished values remain blank. Stat tiles retain their full-history
+definitions when the chart/table range changes. The fixed five-year average row
+is shown only when the full year range is selected.
+
+<details>
+<summary>Preview an index page</summary>
+
+![Index page with quarterly returns and in-graph navigation icons](docs/asset.png)
+
+</details>
 
 ### Summary
-Click **Summary** at the top of the sidebar.
 
-![Summary view](docs/summary.png)
+Summary combines sortable index rankings, an all-index annual chart, an annual
+heatmap and an automatically generated historical performance write-up.
 
-- **Annual returns chart**: one curve per index.
-  - Hover the chart to rank every index for that year in the legend on the right.
-  - Hover a legend entry to highlight its curve, and click it to show or hide that curve. **All** / **None** toggle every curve at once.
-- **How the asset classes performed**: an auto-generated write-up covering 5Y and 10Y leaders and laggards, last year, this year so far, the best risk-adjusted indices, and seasonality.
-- **What may do well next**: simple rules applied to past returns, such as strong long-term indices that are down this year, indices with momentum, and indices whose recent trend has weakened. These are rules of thumb, **not a forecast and not investment advice**.
-- **Annual heatmap**: every index × every year at a glance. Click an index name to open its page.
+- Rankings cover YTD, previous-year return, CAGR, volatility and up-year frequency.
+- Click a column header to sort; click again to reverse direction. Missing values stay last.
+- Returns default to highest first, volatility to lowest first. Index names open their pages.
+- Hover the chart to rank legend entries for that year; hover an entry to highlight its line.
+- Click legend entries to show/hide lines, or use **All / None**.
+- Click an index in the heatmap to open its asset page.
 
-### Compare indices
-Click **Compare indices** in the sidebar, or open `#compare` directly.
+Summary always uses all available data. The heuristic commentary is based on
+past observations, **not a forecast**.
 
-- Select indices using the checkboxes. Nifty50 is initially selected and has a dashed benchmark line; Next50 is also initially selected.
-- **All** selects every index; **None** clears the selection in either comparison mode.
-- **Annual returns** compares calendar-year returns, including current-year YTD.
-- **Growth of ₹10,000** compounds completed quarterly returns. All selected indices start at ₹10,000 on the same date, using their latest uninterrupted shared history. The actual common period is displayed below the chart; changing indices or dates rebases every line.
-- **From / To** filters the comparison by year. The range is shared with asset pages, but does not filter Summary.
-- **Download CSV** exports the selected indices and metric. Growth exports include the initial balance and quarter-end values in INR; this is hypothetical index growth without fees, taxes or additional cash flows.
+<details>
+<summary>Preview the sortable rankings</summary>
 
-The export date and latest available quarter appear above every view. **Data & methodology** contains source information, calculation definitions and limitations. Exports older than 45 days are flagged; the export timestamp does not guarantee every source index was refreshed.
+![Current Summary index rankings](docs/summary.png)
 
-### Chart controls (TradingView-style)
-| Action | How |
+</details>
+
+## Comparison modes
+
+| Mode | What it measures | Important detail |
+|---|---|---|
+| Annual returns | Each calendar year's index return | Current year is YTD, not a completed year. |
+| Growth of ₹10,000 | Completed quarterly returns compounded from a shared starting balance | Uses the latest uninterrupted history common to all selected indices. Changing the selection/range rebases every line. |
+| Excess vs Nifty50 | Index annual return minus Nifty50's same-year return | **Percentage points**, not relative percentage gain: 20% minus 15% is +5 pp. Missing benchmark values remain blank. |
+| 3Y / 5Y rolling CAGR | Annualized returns at each quarter-end using 12 or 20 consecutive quarters | Year filters select endpoints, not the preceding lookback. A missing quarter leaves a blank. |
+| Drawdown | Decline from the running peak since the common starting date | Quarter-end observations only; daily or within-quarter losses may be worse. |
+| Recovery (quarters) | Elapsed quarters below the previous peak, resetting to zero when it is regained | Risk tables include maximum/current drawdown, longest underwater duration, worst trough and worst-episode recovery, or **Not recovered**. |
+
+The displayed common period defines growth, drawdown and recovery comparisons.
+Risk modes use straight lines; other comparison curves are visual interpolation,
+not extra market observations. Growth is hypothetical index performance without
+fees, taxes or additional cash flows; dividends are not added separately.
+
+## Chart controls and exports
+
+The **+**, **−** and **fit-view** icons sit **inside the top-right of each graph**, beside the price axis.
+Hover them for tooltips. PNG export and All/None remain outside the plot.
+
+| Action | Control |
 |---|---|
-| Zoom | Mouse wheel / trackpad pinch, or the **+** / **−** buttons, or `+` / `-` keys |
-| Pan | Click and drag |
-| Stretch an axis | Drag the price or time axis |
-| Fit everything | **Fit** button, double-click the chart, or press `F` |
+| Zoom | In-graph + / − icons, mouse wheel, or `+` / `-` keys |
+| Pan | Click and drag the plot |
+| Stretch | Drag the price or time axis |
+| Fit | In-graph fit-view icon, double-click the plot, or `F` |
+| Export data | **Download CSV** on asset and comparison pages |
+| Export image | **PNG** on asset, Summary and comparison charts |
 
-Links can be shared: `#summary` and `#asset/<Name>` (e.g. [`#asset/PSUBanks`](https://indianindices.github.io/#asset/PSUBanks)) open the matching view directly.
+CSV files respect the selected indices, metric and year range; missing values
+are empty. Growth files include the starting balance and quarter-end values in INR.
+PNG files capture the **visible chart viewport**, not off-screen periods. They
+include titles, period context, export date, source and visible-series legends.
+Summary exports exclude hidden lines; empty comparison charts cannot export a PNG.
 
-The GitHub icon in the top-right opens [the repository](https://github.com/indianindices/indianindices.github.io) in a new tab.
+Direct links work for [Summary](https://indianindices.github.io/#summary),
+[Compare](https://indianindices.github.io/#compare) and individual indices such as
+[PSUBanks](https://indianindices.github.io/#asset/PSUBanks). Use **Copy link** for a
+configured comparison. The top-right GitHub icon returns to this repository.
 
----
+## Data and year rollover
+
+Returns come from [Trendlyne](https://trendlyne.com/). A GitHub Actions workflow
+is scheduled for the **3rd of every month**, and also runs on pushes to `main`
+or through **Actions > Refresh data and deploy > Run workflow**.
+
+The workflow fetches returns, exports website data, commits workbook changes
+when returns or refresh metadata change, and deploys GitHub Pages.
+
+### What happens in 2027?
+
+**Year labels advance automatically after a new export and deployment.**
+The export uses its actual calendar year, rather than a hard-coded 2026 label.
+When the source supplies a 2027 row, it appears as **2027 YTD**. The 2026 row or
+heatmap column becomes **2026**, and ranking/stat labels move to 2027 YTD and
+the previous year, 2026. Year selectors expand to include the supplied years.
+
+This is **not a midnight update** in an already-open browser. It requires a
+new export/deployment and a page reload. Missing source years are not invented;
+an index without a 2027 source row will have no 2027 return yet. Completed 2026
+results also depend on the source having supplied the final values. A saved
+comparison with explicit 2026 end dates intentionally keeps that range until changed.
+
+### Freshness is visible
+
+The dashboard shows the export date and latest available quarter, alongside
+per-index status indicators in the sidebar and comparison list. Asset pages
+show the recorded last successful refresh and last attempt.
+
+| Indicator | Meaning |
+|---|---|
+| Green | A recent successful source fetch was recorded. |
+| Amber | Cached data follows a failed attempt, or the last success is over 45 days old. |
+| Grey | No reliable per-index refresh date has been recorded. |
+
+Older workbooks remain **unknown** until a refresh is recorded. Exporting data
+does not create a source refresh date. A successful fetch records when the source
+was accessed, not when the provider last updated every observation. Failed fetches
+retain prior returns and last-success dates; an index with no usable history
+causes export to abort rather than publish an empty series.
+
+## Methodology
+
+| Metric | Definition |
+|---|---|
+| Quarterly / annual return | Reported by the source; the current year's annual value is YTD. |
+| Stat-tile CAGR | Last 4 × N consecutive available quarterly returns, compounded and annualized. |
+| Historical table CAGR | N consecutive calendar-year annual returns ending in the row year. |
+| Current-year table CAGR | Trailing quarters through the latest available completed quarter. |
+| Annual volatility | Sample standard deviation of completed calendar-year returns. |
+| Up years | Share of completed years with strictly positive annual returns. |
+| Summary risk-adjusted score | Mean annual return divided by annual volatility; **not a Sharpe ratio**. |
+
+Source rounding, available history and missing observations limit precision.
+The in-app **Data & methodology** section explains the calculations and assumptions.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    A[Trendlyne<br/>quarterly returns] -->|build_sectoraldata.py| B[sectoraldata.xlsx]
-    B -->|export_data.py| C[data.json]
-    C --> D[index.html + app.js + style.css]
-    D -->|GitHub Pages| E[indianindices.github.io]
+    A[Trendlyne public returns] --> B[Workbook + per-index refresh metadata]
+    B --> C[JSON export]
+    C --> D[Interactive dashboard]
+    D --> E[GitHub Pages]
 ```
 
-| File | Purpose |
+| File | Responsibility |
 |---|---|
-| [build_sectoraldata.py](build_sectoraldata.py) | Fetches quarterly and annual returns for each index from Trendlyne and writes `sectoraldata.xlsx` (one sheet per index, plus a calculated 5Y CAGR column). If a fetch fails, it keeps that index's previously saved data instead of wiping it. |
-| [export_data.py](export_data.py) | Converts the workbook into `data.json` for the website. It hides quarters that haven't finished yet, and it refuses to export if any index has no data, so a bad refresh is never published. |
-| [index.html](index.html) | Page layout: sidebar, asset view and summary view. |
-| [app.js](app.js) | Everything interactive: routing, charts ([TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts)), colour gradients, CAGR maths and the auto-generated summary. |
-| [style.css](style.css) | Dark theme and layout. |
-| [dev.sh](dev.sh) | Runs the site locally. |
-| [.github/workflows/update-data.yml](.github/workflows/update-data.yml) | The monthly refresh and deployment. |
+| [build_sectoraldata.py](build_sectoraldata.py) | Fetches returns, preserves cached data on failure, and writes workbook calculations and hidden `_RefreshStatus` metadata. |
+| [export_data.py](export_data.py) | Exports JSON with the current calendar year, hides unfinished quarters, and rejects indices without usable history. |
+| [index.html](index.html) | Sidebar and asset, comparison and Summary views. |
+| [app.js](app.js) | Navigation, charts, calculations, rankings, sharing, CSV and PNG exports. |
+| [style.css](style.css) | Responsive layout and visual theme. |
+| [dev.sh](dev.sh) | Exports local data and serves the dashboard. |
+| [.github/workflows/update-data.yml](.github/workflows/update-data.yml) | Scheduled refresh and Pages deployment. |
 
-### How the numbers are calculated
-- **Quarterly / annual returns** come straight from the source. The current year's "annual" value is year-to-date.
-- **CAGR for a past year Y**: the annual returns from Y−N+1 through Y, compounded and annualised.
-- **CAGR for the current year (and the stat tiles)**: the last 4·N quarterly returns up to the last completed quarter, compounded and annualised.
-- **Risk-adjusted score**: average annual return ÷ standard deviation of annual returns.
+Charts use [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts).
+The in-graph and export icons are bundled [Lucide](https://lucide.dev/) assets.
 
-### Automatic updates
-A GitHub Actions workflow runs on the **3rd of every month** (and on every push to `main`). It:
-1. fetches fresh data,
-2. rebuilds `data.json`,
-3. commits the refreshed `sectoraldata.xlsx` if the numbers changed,
-4. deploys the site to GitHub Pages.
+## Local setup
 
-You can also start it manually from **Actions → Refresh data and deploy → Run workflow**.
-
----
-
-## Run locally
+Use Python with the project requirements (CI uses Python 3.12). Node.js 18+
+is needed only for the JavaScript tests; no npm install or frontend build is required.
 
 ```bash
-pip install -r requirements.txt
-./dev.sh             # serve the existing data at http://localhost:8000
-./dev.sh --refresh   # fetch fresh data first
-PORT=9000 ./dev.sh   # use a different port
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+./dev.sh
 ```
 
-## Notes
-- Data source: [Trendlyne](https://trendlyne.com/). Availability depends on that site, so if a refresh is blocked the dashboard keeps showing the last good data.
-- Past performance does not predict future returns. Nothing here is investment advice.
+Open http://localhost:8000. Stop the server with Ctrl+C.
+If that port is occupied, stop the existing preview or run `PORT=9000 ./dev.sh`.
+Use `./dev.sh --refresh` only when you want to fetch live source data and rewrite
+the workbook; ordinary startup exports the existing workbook without fetching.
 
-## Checks
+### Checks
 
-Run the focused dashboard regression tests with `node --test tests/app.test.cjs` (no npm dependencies required).
+```bash
+node --test tests/app.test.cjs
+python3 -m unittest discover -s tests -p 'test_*.py'
+git diff --check
+```
+
+Tests cover return calculations, comparison modes, rankings, export metadata,
+share links, refresh fallbacks and 2027 rollover. Python tests use mocked requests
+and temporary workbooks; they do not fetch live data or modify the real workbook.
+
+### Recreating the artwork
+
+The banner is original artwork, not an illustration of actual index prices.
+Its generator requires optional Pillow and a TrueType font; neither is needed
+to run the dashboard. The default font path is DejaVu Sans Bold on Linux.
+
+```bash
+python -m pip install Pillow
+python3 docs/make_banner.py
+# Optional ImageMagick optimization:
+convert docs/brand.gif -layers Optimize docs/brand.gif
+```
+
+Use `--font /path/to/font.ttf` for a different font location. The generator
+produces both the animated [banner](docs/brand.gif) and a [static alternative](docs/brand.png).
+
+## Contribute and support
+
+Bug reports, data-quality fixes, accessibility work and focused features are
+welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests and pull-request
+guidelines. Report bugs through [GitHub Issues](https://github.com/indianindices/indianindices.github.io/issues).
+Use the repository's **Sponsor** button to support the project.
+
+**Past performance does not predict future returns. This project is not investment advice.**

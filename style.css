@@ -80,6 +80,13 @@ body {
 .nav:hover { background: var(--panel-2); }
 .nav.active { background: var(--panel-2); border-color: var(--accent); }
 .nav .badge { font-size: 11px; font-variant-numeric: tabular-nums; padding: 2px 6px; border-radius: 6px; }
+.nav-meta { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.refresh-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.refresh-dot.fresh { background: var(--pos); }
+.refresh-dot.cached, .refresh-dot.stale, .refresh-dot.unavailable { background: #fbbf24; }
+.index-freshness { margin: -4px 0 16px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.index-freshness.cached, .index-freshness.stale, .index-freshness.unavailable { color: #fbbf24; }
+.choice-name { flex: 1; min-width: 0; }
 
 .nav.summary {
   justify-content: center;
@@ -131,8 +138,12 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; color: #cfd6e4; }
 .card > h2 { margin-bottom: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; flex-wrap: wrap; }
 
-.toolbar { display: flex; gap: 6px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; }
 .toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   min-width: 34px;
   padding: 6px 10px;
   border-radius: 8px;
@@ -143,6 +154,9 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; color: #cfd6e4; }
   font-weight: 600;
 }
 .toolbar button:hover { border-color: var(--accent); }
+.toolbar img { display: block; filter: invert(1); }
+.toolbar button:disabled { opacity: 0.4; cursor: default; }
+.export-status { display: block; min-height: 16px; margin-top: 4px; color: var(--muted); font-size: 12px; }
 .period-toggle { display: flex; flex-wrap: wrap; gap: 4px; }
 .period-toggle button {
   padding: 7px 10px;
@@ -156,13 +170,47 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; color: #cfd6e4; }
 }
 .period-toggle button[aria-pressed="true"] { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
 .period-toggle button:hover, .period-toggle button:focus-visible { color: var(--text); border-color: var(--accent); }
+#compareMode button {
+  --mode-rgb: 103, 232, 249;
+  color: rgb(var(--mode-rgb));
+  background: rgba(var(--mode-rgb), 0.08);
+  border-color: rgba(var(--mode-rgb), 0.24);
+  font-weight: 600;
+}
+#compareMode button[data-mode="growth"] { --mode-rgb: 110, 231, 183; }
+#compareMode button[data-mode="excess"] { --mode-rgb: 252, 211, 77; }
+#compareMode button[data-mode="rolling3"] { --mode-rgb: 147, 197, 253; }
+#compareMode button[data-mode="rolling5"] { --mode-rgb: 196, 181, 253; }
+#compareMode button[data-mode="drawdown"] { --mode-rgb: 253, 164, 175; }
+#compareMode button[data-mode="recovery"] { --mode-rgb: 253, 186, 116; }
+#compareMode button[aria-pressed="true"] { background: rgba(var(--mode-rgb), 0.2); border-color: rgba(var(--mode-rgb), 0.85); }
+#compareMode button:hover, #compareMode button:focus-visible { background: rgba(var(--mode-rgb), 0.16); border-color: rgb(var(--mode-rgb)); }
+#compareMode button:focus-visible { outline: 2px solid rgb(var(--mode-rgb)); outline-offset: 2px; }
 
 .range-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
 .range-controls label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .range-controls select { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 8px; font: inherit; }
 .range-controls select:focus-visible { outline: 2px solid var(--accent); }
+#shareStatus { color: var(--muted); font-size: 12px; }
+#shareFallback { margin-bottom: 16px; font-size: 12px; color: var(--muted); }
+#shareFallback:not([hidden]) { display: block; }
+#shareLink { display: block; width: 100%; margin-top: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--text); }
 
 .chart-wrap { position: relative; flex: 1; min-width: 0; }
+.chart-controls {
+  position: absolute;
+  top: 10px;
+  right: 64px;
+  z-index: 6;
+  flex-wrap: nowrap;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(11, 15, 23, 0.92);
+}
+.chart-controls button { width: 32px; height: 32px; min-width: 32px; padding: 0; border-radius: 5px; }
+.chart-controls button:focus-visible { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .chart { height: 380px; width: 100%; }
 .chart.tall { height: 520px; }
 .hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
@@ -183,6 +231,7 @@ h2 { margin: 0; font-size: 15px; font-weight: 600; color: #cfd6e4; }
 #compareTip div { display: flex; align-items: baseline; gap: 12px; }
 #compareTip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #compareTip b { display: inline; flex-shrink: 0; font-size: 12px; line-height: 16px; }
+#compareTip .tip-unit { display: block; color: var(--muted); font-size: 11px; line-height: 14px; margin-bottom: 4px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
 .chip {
@@ -260,6 +309,18 @@ table.heat td.label:hover { color: var(--accent-2); }
 .compare-choices input { accent-color: var(--accent); flex-shrink: 0; }
 .compare-choices .dot { width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
 .download-csv:disabled { opacity: 0.4; cursor: default; }
+.risk-details { margin: 22px 0; }
+.risk-details h2 { margin-bottom: 12px; }
+#riskTable td { white-space: nowrap; }
+.rankings-section { margin: 20px 0 26px; }
+.rankings-section h2 { margin-bottom: 12px; }
+.ranking-sort { display: inline-flex; align-items: center; gap: 4px; padding: 2px 0; border: 0; background: none; color: inherit; font: inherit; text-transform: inherit; white-space: nowrap; cursor: pointer; }
+.ranking-sort span { display: inline-block; width: 12px; }
+.ranking-sort:hover, #rankings th[aria-sort="ascending"], #rankings th[aria-sort="descending"] { color: var(--accent-2); }
+.ranking-sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+#rankings td { white-space: nowrap; }
+#rankings .label a { color: inherit; text-decoration: none; }
+#rankings .label a:hover, #rankings .label a:focus-visible { color: var(--accent-2); }
 
 #summaryText h2 { margin-bottom: 10px; }
 #summaryText h3 { margin: 18px 0 8px; font-size: 14px; color: var(--accent-2); }

@@ -15,6 +15,7 @@ from openpyxl.utils import get_column_letter
 ROOT = Path(__file__).parent
 CSV_PATH = ROOT / "sectoraldata.csv"
 XLSX_PATH = ROOT / "sectoraldata.xlsx"
+METADATA_SHEET = "_RefreshStatus"
 
 REQUESTED = [
     "Nifty50", "Next50", "IT", "Infra", "Consumption", "Energy", "Healthcare", "Pharma",
@@ -135,6 +136,8 @@ def write_sheet(workbook, name, rows, note=None):
 
 def add_cagr(workbook):
     for sheet in workbook.worksheets:
+        if sheet.title == METADATA_SHEET:
+            continue
         header = sheet.cell(1, 7, "5Y CAGR (Calculated)")
         header.font = Font(bold=True, color="FFFFFF")
         header.fill = PatternFill("solid", fgColor="1F4E78")
@@ -180,26 +183,50 @@ def previous_rows():
     if not XLSX_PATH.exists():
         return {}
     saved = {}
-    for sheet in load_workbook(XLSX_PATH, read_only=True).worksheets:
-        saved[sheet.title] = [
-            [label, *[round(value * 100, 4) if isinstance(value, (int, float)) else value for value in values]]
-            for label, *values in sheet.iter_rows(min_row=2, max_col=6, values_only=True)
-            if label == "5Yr Avg" or isinstance(label, int)
-        ]
+    workbook = load_workbook(XLSX_PATH, read_only=True)
+    try:
+        for sheet in workbook.worksheets:
+            if sheet.title == METADATA_SHEET:
+                continue
+            saved[sheet.title] = [
+                [label, *[round(value * 100, 4) if isinstance(value, (int, float)) else value for value in values]]
+                for label, *values in sheet.iter_rows(min_row=2, max_col=6, values_only=True)
+                if label == "5Yr Avg" or isinstance(label, int)
+            ]
+    finally:
+        workbook.close()
     return saved
+
+
+def previous_status():
+    if not XLSX_PATH.exists():
+        return {}
+    workbook = load_workbook(XLSX_PATH, read_only=True)
+    try:
+        if METADATA_SHEET not in workbook.sheetnames:
+            return {}
+        return {name: last_success for name, last_success, *_ in workbook[METADATA_SHEET].iter_rows(min_row=2, max_col=4, values_only=True) if name}
+    finally:
+        workbook.close()
 
 
 def main():
     saved = previous_rows()
+    last_success = previous_status()
+    attempted = date.today().isoformat()
+    statuses = []
     workbook = Workbook()
     workbook.remove(workbook.active)
     for name in REQUESTED:
+        fetched = False
         if name in TRENDLYNE_IDS:
             try:
                 rows = trendlyne_quarterly_returns(TRENDLYNE_IDS[name])
                 note = f"Source: Trendlyne quarterly seasonality data, index ID {TRENDLYNE_IDS[name]}; pattern column omitted."
-                if not rows:
+                if not any(isinstance(row[0], int) for row in rows):
+                    rows = []
                     note = f"No quarterly data returned by Trendlyne for index ID {TRENDLYNE_IDS[name]}."
+                fetched = bool(rows)
             except Exception as error:
                 rows = []
                 note = f"Trendlyne data unavailable for index ID {TRENDLYNE_IDS[name]}: {error}"
@@ -210,9 +237,16 @@ def main():
         else:
             rows = []
             note = "No reliable public symbol mapping was found; no values were fabricated."
+        status = "fresh" if fetched else "cached" if rows else "unavailable"
+        statuses.append([name, attempted if fetched else last_success.get(name), attempted, status])
         if name == "Nifty50":
             pd.DataFrame([[name, *row] for row in rows], columns=["Index", "Year", "Q1", "Q2", "Q3", "Q4", "Annual Returns"]).to_csv(CSV_PATH, index=False)
         write_sheet(workbook, name, rows, note)
+    metadata = workbook.create_sheet(METADATA_SHEET)
+    metadata.append(["Index", "Last successful refresh", "Last refresh attempt", "Status"])
+    for record in statuses:
+        metadata.append(record)
+    metadata.sheet_state = "hidden"
     add_cagr(workbook)
     workbook.save(XLSX_PATH)
 
