@@ -18,7 +18,8 @@ Pick any index from the sidebar (or type in **Search assets**). The coloured bad
 ![Asset view](docs/asset.png)
 
 - **Stat tiles**: this year's return so far (YTD), last year, the 3Y / 5Y / 10Y CAGR up to the last completed quarter, best and worst year, the share of years that ended positive, and volatility.
-- **Quarterly returns chart**: one bar per quarter. Deep green bars are very strong quarters and deep red bars are very weak ones.
+- **Returns chart**: starts with one bar per quarter. Click **Annual returns** for one bar per calendar year, or **Quarterly returns** to switch back. The current year's annual bar is labelled **YTD**. Deep green bars are very strong returns and deep red bars are very weak ones.
+- **From / To**: choose a calendar-year range for the chart and returns table. Stat tiles keep their full-history definitions. **Download CSV** exports returns in the selected range; missing values are blank.
 - **Returns table**: every year and quarter, colour-graded from dark red (very bad) through pale tones to dark green (very good).
   - Click the **5Y CAGR** header to switch between **3Y / 5Y / 10Y CAGR**.
   - Rows for past years show the calendar-year CAGR ending that year. The current-year row shows the **trailing** CAGR up to the last completed quarter, comparable to what Screener and similar sites report.
@@ -36,6 +37,18 @@ Click **Summary** at the top of the sidebar.
 - **What may do well next**: simple rules applied to past returns, such as strong long-term indices that are down this year, indices with momentum, and indices whose recent trend has weakened. These are rules of thumb, **not a forecast and not investment advice**.
 - **Annual heatmap**: every index × every year at a glance. Click an index name to open its page.
 
+### Compare indices
+Click **Compare indices** in the sidebar, or open `#compare` directly.
+
+- Select indices using the checkboxes. Nifty50 is initially selected and has a dashed benchmark line; Next50 is also initially selected.
+- **All** selects every index; **None** clears the selection in either comparison mode.
+- **Annual returns** compares calendar-year returns, including current-year YTD.
+- **Growth of ₹10,000** compounds completed quarterly returns. All selected indices start at ₹10,000 on the same date, using their latest uninterrupted shared history. The actual common period is displayed below the chart; changing indices or dates rebases every line.
+- **From / To** filters the comparison by year. The range is shared with asset pages, but does not filter Summary.
+- **Download CSV** exports the selected indices and metric. Growth exports include the initial balance and quarter-end values in INR; this is hypothetical index growth without fees, taxes or additional cash flows.
+
+The export date and latest available quarter appear above every view. **Data & methodology** contains source information, calculation definitions and limitations. Exports older than 45 days are flagged; the export timestamp does not guarantee every source index was refreshed.
+
 ### Chart controls (TradingView-style)
 | Action | How |
 |---|---|
@@ -45,6 +58,8 @@ Click **Summary** at the top of the sidebar.
 | Fit everything | **Fit** button, double-click the chart, or press `F` |
 
 Links can be shared: `#summary` and `#asset/<Name>` (e.g. [`#asset/PSUBanks`](https://indianindices.github.io/#asset/PSUBanks)) open the matching view directly.
+
+The GitHub icon in the top-right opens [the repository](https://github.com/indianindices/indianindices.github.io) in a new tab.
 
 ---
 
@@ -97,3 +112,7 @@ PORT=9000 ./dev.sh   # use a different port
 ## Notes
 - Data source: [Trendlyne](https://trendlyne.com/). Availability depends on that site, so if a refresh is blocked the dashboard keeps showing the last good data.
 - Past performance does not predict future returns. Nothing here is investment advice.
+
+## Checks
+
+Run the focused dashboard regression tests with `node --test tests/app.test.cjs` (no npm dependencies required).

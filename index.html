@@ -8,8 +8,12 @@
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
+  <a class="repo-link" href="https://github.com/indianindices/indianindices.github.io" target="_blank" rel="noopener noreferrer" aria-label="View GitHub repository" title="View GitHub repository">
+    <img src="docs/github.svg" width="24" height="24" alt="">
+  </a>
   <aside id="sidebar">
     <div class="brand">Indian<span>Sectors</span></div>
+    <button id="compareBtn" class="nav summary">Compare indices</button>
     <button id="summaryBtn" class="nav summary">Summary</button>
     <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
     <div id="assetList"></div>
@@ -17,12 +21,66 @@
   </aside>
 
   <main>
+    <div class="data-meta">
+      <span id="freshness"></span>
+      <details class="methodology">
+        <summary>Data &amp; methodology</summary>
+        <dl>
+          <dt>Source</dt><dd><a href="https://trendlyne.com/" target="_blank" rel="noopener noreferrer">Trendlyne</a>. Exports refresh monthly; an export date is not a guarantee of fresh source data for every index.</dd>
+          <dt>Returns</dt><dd>Calendar-year and quarterly index returns. The current year's annual value is YTD, not a completed year. Blank values mean unavailable or unfinished periods.</dd>
+          <dt>Growth of &#8377;10,000</dt><dd>Quarterly compounding on the latest uninterrupted history shared by all selected indices. Each line starts at &#8377;10,000 immediately before the first included quarter. Only completed quarters are included; the result can differ from the latest annual YTD value. Changing the selection or range resets the common starting date.</dd>
+          <dt>Assumptions</dt><dd>Hypothetical index growth, not an investable portfolio. No fees, taxes or additional cash flows; dividends are not added separately.</dd>
+          <dt>CAGR</dt><dd>Stat tiles use the last 4 × N available consecutive quarterly returns. Historical table values compound N calendar years; current-year CAGR ends at the last available completed quarter.</dd>
+          <dt>Statistics and filters</dt><dd>Best/worst year, up years and annual volatility use completed years across the full available history. Stat tiles are not changed by the chart/table year filters. The Summary view always uses all available data.</dd>
+          <dt>Risk</dt><dd>Annual volatility is sample standard deviation. The summary's risk-adjusted score is mean annual return divided by annual volatility, not a Sharpe ratio. Past performance does not predict future returns; this is not investment advice.</dd>
+        </dl>
+      </details>
+    </div>
+    <section id="compareView" hidden>
+      <h1>Compare indices</h1>
+      <div class="range-controls" aria-label="Comparison date range">
+        <label>From <select class="from-year" aria-label="Comparison from year"></select></label>
+        <label>To <select class="to-year" aria-label="Comparison to year"></select></label>
+        <div class="toolbar"><button type="button" class="download-csv">Download CSV</button></div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <div id="compareMode" class="period-toggle" role="group" aria-label="Comparison metric">
+            <button type="button" data-mode="returns" aria-pressed="true" aria-controls="compareChart">Annual returns</button>
+            <button type="button" data-mode="growth" aria-pressed="false" aria-controls="compareChart">Growth of &#8377;10,000</button>
+          </div>
+          <div class="toolbar" data-chart="compare">
+            <button data-act="all">All</button>
+            <button data-act="none">None</button>
+            <button data-act="in" title="Zoom in (+)">+</button>
+            <button data-act="out" title="Zoom out (-)">&minus;</button>
+            <button data-act="fit" title="Fit to view (F)">Fit</button>
+          </div>
+        </div>
+        <div class="summary-chart">
+          <div class="chart-wrap">
+            <div id="compareChart" class="chart tall"></div>
+            <div id="compareTip" class="tip" hidden></div>
+          </div>
+          <fieldset id="compareChoices" class="compare-choices"><legend>Indices</legend></fieldset>
+        </div>
+        <p id="compareStatus" class="hint" role="status"></p>
+      </div>
+    </section>
     <section id="assetView" hidden>
       <h1 id="assetTitle"></h1>
       <div class="chips" id="assetStats"></div>
+      <div class="range-controls" aria-label="Asset date range">
+        <label>From <select class="from-year" aria-label="Asset from year"></select></label>
+        <label>To <select class="to-year" aria-label="Asset to year"></select></label>
+        <div class="toolbar"><button type="button" class="download-csv">Download CSV</button></div>
+      </div>
       <div class="card">
         <div class="card-head">
-          <h2>Quarterly returns</h2>
+          <div id="returnPeriod" class="period-toggle" role="group" aria-label="Return period">
+            <button type="button" data-period="quarterly" aria-pressed="true" aria-controls="assetChart">Quarterly returns</button>
+            <button type="button" data-period="annual" aria-pressed="false" aria-controls="assetChart">Annual returns</button>
+          </div>
           <div class="toolbar" data-chart="asset">
             <button data-act="in" title="Zoom in (+)">+</button>
             <button data-act="out" title="Zoom out (-)">&minus;</button>

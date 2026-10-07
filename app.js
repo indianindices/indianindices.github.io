@@ -1,7 +1,7 @@
 const LC = LightweightCharts;
 const QEND = [[3, 31], [6, 30], [9, 30], [12, 31]];
 const $ = (s) => document.querySelector(s);
-const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5 };
+const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", compareNames: [], compareMode: "returns", fromYear: null, toYear: null };
 
 const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`);
 const cls = (v) => (v == null ? "" : v >= 0 ? "pos" : "neg");
@@ -99,6 +99,11 @@ function fit(chart) {
 }
 
 // ---------- asset view ----------
+function assetPeriodLabel(time) {
+  const year = yearOf(time);
+  return state.returnPeriod === "annual" ? `${year}${year === state.data.currentYear ? " YTD" : ""}` : `${year} Q${Math.ceil(monthOf(time) / 3)}`;
+}
+
 function ensureAssetChart() {
   if (state.charts.asset) return state.charts.asset;
   const el = $("#assetChart");
@@ -119,7 +124,7 @@ function ensureAssetChart() {
     const d = p.time && p.point && p.seriesData.get(series);
     if (!d) return (tip.hidden = true);
     tip.hidden = false;
-    tip.innerHTML = `${yearOf(p.time)} Q${Math.ceil(monthOf(p.time) / 3)}<b class="${cls(d.value)}">${fmt(d.value)}</b>`;
+    tip.innerHTML = `${assetPeriodLabel(p.time)}<b class="${cls(d.value)}">${fmt(d.value)}</b>`;
     const w = el.clientWidth;
     tip.style.left = `${Math.min(p.point.x + 14, w - 130)}px`;
     tip.style.top = `${Math.max(p.point.y - 50, 4)}px`;
@@ -131,6 +136,7 @@ function ensureAssetChart() {
 
 function renderAsset(name, keepZoom = false) {
   const rows = state.data.assets[name];
+  const displayed = rows.filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear);
   const s = state.stats[name];
   const cy = state.data.currentYear;
   $("#assetTitle").textContent = name;
@@ -149,9 +155,17 @@ function renderAsset(name, keepZoom = false) {
   ].join("");
 
   const { chart, series } = ensureAssetChart();
-  const points = rows
-    .filter((r) => !r.avg)
-    .flatMap((r) => r.q.map((v, i) => (v == null ? null : { time: { year: r.year, month: QEND[i][0], day: QEND[i][1] }, value: v, color: shade(v, 15).hex })))
+  const annual = state.returnPeriod === "annual";
+  $("#assetTip").hidden = true;
+  document.querySelectorAll("#returnPeriod button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.period === state.returnPeriod)));
+  chart.applyOptions({
+    timeScale: { tickMarkFormatter: (time, type) => annual ? assetPeriodLabel(time) : type === LC.TickMarkType.Year ? String(yearOf(time)) : `Q${Math.ceil(monthOf(time) / 3)} '${String(yearOf(time)).slice(2)}` },
+    localization: { timeFormatter: assetPeriodLabel },
+  });
+  const points = displayed
+    .flatMap((r) => annual
+      ? r.annual == null ? [] : [{ time: { year: r.year, month: 12, day: 31 }, value: r.annual, color: shade(r.annual, 40).hex }]
+      : r.q.map((v, i) => (v == null ? null : { time: { year: r.year, month: QEND[i][0], day: QEND[i][1] }, value: v, color: shade(v, 15).hex })))
     .filter(Boolean)
     .sort((a, b) => a.time.year - b.time.year || a.time.month - b.time.month);
   series.setData(points);
@@ -168,13 +182,131 @@ function renderAsset(name, keepZoom = false) {
     }
     return (p ** (1 / n) - 1) * 100;
   };
-  const body = rows.map((r) => {
+  const tableRows = state.fromYear === state.firstYear && state.toYear === state.lastYear ? rows : displayed;
+  const body = tableRows.map((r) => {
     const label = r.avg ? "5Y Avg" : r.year === cy ? `${r.year} YTD` : r.year;
     const tip = r.year === cy ? `title="Trailing ${n}Y to the last completed quarter"` : "";
     return `<tr class="${r.avg ? "avg" : ""}"><td class="label">${label}</td>${r.q.map((v) => cell(v, 15)).join("")}${cell(r.annual, 40)}${r.avg ? '<td class="empty">—</td>' : cell(rolling(r.year), 25, tip)}</tr>`;
   }).join("");
   const options = [3, 5, 10].map((k) => `<option value="${k}" ${k === n ? "selected" : ""}>${k}Y CAGR</option>`).join("");
   $("#assetTable").innerHTML = `<thead><tr><th>Year</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th><th><select id="cagrSelect" class="th-select">${options}</select></th></tr></thead><tbody>${body}</tbody>`;
+}
+
+const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+const quarterTime = (key) => ({ year: Math.floor(key / 4), month: QEND[key % 4][0], day: QEND[key % 4][1] });
+const quarterLabel = (key) => `Q${key % 4 + 1} ${Math.floor(key / 4)}`;
+
+function growthData(names, fromYear = -Infinity, toYear = Infinity) {
+  if (!names.length) return null;
+  const maps = names.map((name) => new Map(state.data.assets[name].filter((row) => !row.avg && row.year >= fromYear && row.year <= toYear)
+    .flatMap((row) => row.q.flatMap((value, index) => Number.isFinite(value) ? [[row.year * 4 + index, value]] : []))));
+  const common = [...maps[0].keys()].filter((key) => maps.every((map) => map.has(key))).sort((left, right) => left - right);
+  if (!common.length) return null;
+  const end = common[common.length - 1];
+  let start = end;
+  while (maps.every((map) => map.has(start - 1))) start--;
+  const series = maps.map((map) => {
+    let value = 10000;
+    const points = [{ time: quarterTime(start - 1), value }];
+    for (let key = start; key <= end; key++) {
+      value *= 1 + map.get(key) / 100;
+      points.push({ time: quarterTime(key), value });
+    }
+    return points;
+  });
+  return { start, end, series };
+}
+
+function ensureCompareChart() {
+  if (state.charts.compare) return state.charts.compare;
+  const chart = LC.createChart($("#compareChart"), baseOptions({
+    timeScale: { borderColor: "rgba(255,255,255,0.1)", tickMarkFormatter: (time) => String(yearOf(time)) },
+    localization: { timeFormatter: (time) => `${yearOf(time)}${yearOf(time) === state.data.currentYear ? " YTD" : ""}`, priceFormatter: (value) => `${value.toFixed(2)}%` },
+  }));
+  const entry = { chart, lines: [] };
+  chart.subscribeCrosshairMove((event) => {
+    const tip = $("#compareTip");
+    if (!event.time || !event.point) return (tip.hidden = true);
+    const values = entry.lines.flatMap((line) => {
+      const point = event.seriesData.get(line.series);
+      return point?.value == null ? [] : [`<div><span>${esc(line.name)}</span><b class="${state.compareMode === "growth" ? "" : cls(point.value)}">${state.compareMode === "growth" ? money(point.value) : fmt(point.value)}</b></div>`];
+    });
+    tip.hidden = !values.length;
+    tip.innerHTML = `${chart.options().localization.timeFormatter(event.time)}${values.join("")}`;
+    tip.style.left = `${Math.max(0, Math.min(event.point.x + 12, $("#compareChart").clientWidth - Math.ceil(tip.getBoundingClientRect().width)))}px`;
+    tip.style.top = "8px";
+  });
+  $("#compareChart").addEventListener("dblclick", () => fit(chart));
+  state.charts.compare = entry;
+  return entry;
+}
+
+function renderCompare() {
+  const entry = ensureCompareChart();
+  entry.lines.forEach((line) => entry.chart.removeSeries(line.series));
+  entry.lines = [];
+  $("#compareTip").hidden = true;
+  const growth = state.compareMode === "growth";
+  const selected = state.names.filter((name) => state.compareNames.includes(name));
+  const compounded = growth ? growthData(selected, state.fromYear, state.toYear) : null;
+  const formatter = growth ? money : (value) => `${value.toFixed(2)}%`;
+  document.querySelectorAll("#compareMode button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === state.compareMode)));
+  entry.chart.applyOptions({
+    timeScale: { tickMarkFormatter: (time) => String(yearOf(time)) },
+    localization: { priceFormatter: formatter, timeFormatter: (time) => growth ? `${yearOf(time)} Q${Math.ceil(monthOf(time) / 3)}` : `${yearOf(time)}${yearOf(time) === state.data.currentYear ? " YTD" : ""}` },
+  });
+  state.names.forEach((name, index) => {
+    if (!selected.includes(name) || (growth && !compounded)) return;
+    const series = entry.chart.addLineSeries({
+      color: hsla((index * 137.508) % 360, 80, 62), lineWidth: name === "Nifty50" ? 3 : 2,
+      lineStyle: name === "Nifty50" ? LC.LineStyle.Dashed : LC.LineStyle.Solid,
+      priceLineVisible: false, lastValueVisible: false,
+      priceFormat: { type: "custom", formatter },
+    });
+    series.setData(growth ? compounded.series[selected.indexOf(name)] : state.data.assets[name].filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear).sort((left, right) => left.year - right.year)
+      .map((row) => ({ time: { year: row.year, month: 12, day: 31 }, ...(row.annual == null ? {} : { value: row.annual }) })));
+    entry.lines.push({ name, series });
+  });
+  $("#compareStatus").textContent = !selected.length ? "No indices selected" : growth
+    ? compounded ? `₹10,000 at end of ${quarterLabel(compounded.start - 1)} · through ${quarterLabel(compounded.end)} · common uninterrupted history` : "No shared quarterly history"
+    : `${selected.length} indices · ${state.data.currentYear} is YTD`;
+  $("#compareView .download-csv").disabled = !selected.length || (growth && !compounded);
+  requestAnimationFrame(() => fit(entry.chart));
+}
+
+function csvText(records) {
+  return records.map((record) => record.map((value) => {
+    let text = value == null ? "" : String(value);
+    if (typeof value === "string" && /^[=+@\-\t\r]/.test(text)) text = `'${text}`;
+    return `"${text.replace(/"/g, '""')}"`;
+  }).join(",")).join("\r\n");
+}
+
+function exportRecords() {
+  if (state.view === "asset") {
+    return [["Index", "Year", "Period", "Q1 (%)", "Q2 (%)", "Q3 (%)", "Q4 (%)", "Annual return (%)"],
+      ...state.data.assets[state.asset].filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
+        .map((row) => [state.asset, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", ...row.q, row.annual])];
+  }
+  const selected = state.names.filter((name) => state.compareNames.includes(name));
+  if (state.compareMode === "growth") {
+    const compounded = growthData(selected, state.fromYear, state.toYear);
+    return [["Index", "Date", "Investment value (INR)"], ...(compounded ? selected.flatMap((name, index) => compounded.series[index].map((point) => [name,
+      `${point.time.year}-${String(point.time.month).padStart(2, "0")}-${String(point.time.day).padStart(2, "0")}`, Number(point.value.toFixed(2))])) : [])];
+  }
+  return [["Index", "Year", "Period", "Annual return (%)"], ...selected.flatMap((name) => state.data.assets[name]
+    .filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
+    .map((row) => [name, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", row.annual]))];
+}
+
+function downloadCsv() {
+  const url = URL.createObjectURL(new Blob(["\uFEFF", csvText(exportRecords())], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  const name = state.view === "asset" ? state.asset : `comparison-${state.compareMode}`;
+  link.download = `${name.replace(/[^a-z0-9_-]/gi, "_")}-${state.fromYear}-${state.toYear}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ---------- summary view ----------
@@ -323,17 +455,24 @@ function renderSidebar() {
       return `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span>${badge}</button>`;
     }).join("");
   $("#summaryBtn").classList.toggle("active", state.view === "summary");
+  $("#compareBtn").classList.toggle("active", state.view === "compare");
 }
 
 function route() {
   const hash = decodeURIComponent(location.hash.slice(1));
   const name = hash.startsWith("asset/") ? hash.slice(6) : null;
+  $("#compareView").hidden = hash !== "compare";
   if (name && state.data.assets[name]) {
     state.view = "asset";
     state.asset = name;
     $("#summaryView").hidden = true;
     $("#assetView").hidden = false;
     renderAsset(name);
+  } else if (hash === "compare") {
+    state.view = "compare";
+    $("#assetView").hidden = true;
+    $("#summaryView").hidden = true;
+    renderCompare();
   } else if (hash === "summary") {
     state.view = "summary";
     $("#assetView").hidden = true;
@@ -348,11 +487,38 @@ function route() {
 }
 
 function activeChart() {
-  return state.view === "summary" ? state.charts.summary?.chart : state.charts.asset?.chart;
+  return state.charts[state.view]?.chart;
 }
 
 function bindUI() {
+  document.querySelectorAll(".range-controls select").forEach((select) => select.addEventListener("change", () => {
+    if (select.classList.contains("from-year")) {
+      state.fromYear = +select.value;
+      state.toYear = Math.max(state.fromYear, state.toYear);
+    } else {
+      state.toYear = +select.value;
+      state.fromYear = Math.min(state.fromYear, state.toYear);
+    }
+    document.querySelectorAll(".from-year").forEach((input) => (input.value = state.fromYear));
+    document.querySelectorAll(".to-year").forEach((input) => (input.value = state.toYear));
+    if (state.view === "asset") renderAsset(state.asset);
+    else renderCompare();
+  }));
+  document.querySelectorAll(".download-csv").forEach((button) => button.addEventListener("click", downloadCsv));
   $("#summaryBtn").addEventListener("click", () => (location.hash = "summary"));
+  $("#compareBtn").addEventListener("click", () => (location.hash = "compare"));
+  $("#compareMode").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-mode]");
+    if (!button || button.dataset.mode === state.compareMode) return;
+    state.compareMode = button.dataset.mode;
+    renderCompare();
+  });
+  $("#compareChoices").addEventListener("change", (event) => {
+    const input = event.target;
+    if (!input.matches("input[data-name]")) return;
+    state.compareNames = input.checked ? [...state.compareNames, input.dataset.name] : state.compareNames.filter((name) => name !== input.dataset.name);
+    renderCompare();
+  });
   $("#assetList").addEventListener("click", (e) => {
     const b = e.target.closest(".nav");
     if (b) location.hash = `asset/${encodeURIComponent(b.dataset.name)}`;
@@ -362,6 +528,12 @@ function bindUI() {
     if (td) location.hash = `asset/${encodeURIComponent(td.dataset.name)}`;
   });
   $("#search").addEventListener("input", renderSidebar);
+  $("#returnPeriod").addEventListener("click", (e) => {
+    const button = e.target.closest("button[data-period]");
+    if (!button || button.dataset.period === state.returnPeriod) return;
+    state.returnPeriod = button.dataset.period;
+    renderAsset(state.asset);
+  });
   $("#assetTable").addEventListener("change", (e) => {
     if (e.target.id !== "cagrSelect") return;
     state.cagrYears = +e.target.value;
@@ -375,12 +547,18 @@ function bindUI() {
     if (act === "out") zoom(c.chart, 1.4);
     if (act === "fit") fit(c.chart);
     if (act === "all" || act === "none") {
+      if (bar.dataset.chart === "compare") {
+        state.compareNames = act === "all" ? [...state.names] : [];
+        document.querySelectorAll("#compareChoices input").forEach((input) => (input.checked = act === "all"));
+        renderCompare();
+        return;
+      }
       c.lines.forEach((l) => { l.visible = act === "all"; l.series.applyOptions({ visible: l.visible }); });
       c.renderLegend(null);
     }
   }));
   document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT") return;
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(e.target.tagName)) return;
     const chart = activeChart();
     if (!chart) return;
     if (e.key === "+" || e.key === "=") zoom(chart, 0.7);
@@ -394,8 +572,20 @@ async function init() {
   const res = await fetch("data.json", { cache: "no-store" });
   state.data = await res.json();
   state.names = Object.keys(state.data.assets);
+  const years = [...new Set(state.names.flatMap((name) => state.data.assets[name].filter((row) => !row.avg).map((row) => row.year)))].sort((left, right) => left - right);
+  state.firstYear = state.fromYear = years[0];
+  state.lastYear = state.toYear = years[years.length - 1];
+  document.querySelectorAll(".range-controls select").forEach((select) => {
+    select.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join("");
+    select.value = select.classList.contains("from-year") ? state.fromYear : state.toYear;
+  });
+  state.compareNames = state.names.filter((name, index) => name === "Nifty50" || index === 1);
+  $("#compareChoices").innerHTML = "<legend>Indices</legend>" + state.names.map((name, index) => `<label><input type="checkbox" data-name="${esc(name)}" ${state.compareNames.includes(name) ? "checked" : ""}><span class="dot" style="background:${hsla((index * 137.508) % 360, 80, 62)}"></span>${esc(name)}</label>`).join("");
   const lastQ = Math.max(...state.names.flatMap((n) => state.data.assets[n].filter((r) => !r.avg).flatMap((r) => r.q.map((v, i) => (v == null ? -1 : r.year * 4 + i)))));
   state.asOf = `Q${(lastQ % 4) + 1} ${Math.floor(lastQ / 4)}`;
+  const ageDays = (Date.now() - Date.parse(state.data.generated)) / 86400000;
+  $("#freshness").textContent = `Data exported ${state.data.generated} · latest available quarter ${state.asOf}${ageDays > 45 ? " · export over 45 days old" : ""}`;
+  $("#freshness").classList.toggle("stale", ageDays > 45);
   state.names.forEach((n) => (state.stats[n] = computeStats(state.data.assets[n])));
   $("#foot").textContent = `Data exported ${state.data.generated}`;
   bindUI();
