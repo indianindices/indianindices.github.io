@@ -1,7 +1,5 @@
-# Indian Sectors
-
 <p align="center">
-  <img src="docs/brand.gif" alt="Indian Sectors: a mint bull and coral bear with gently animated market candles" width="1200">
+  <img src="docs/brand.png" alt="Indian Sectors: a mint bull and coral bear with market candles" width="1200">
 </p>
 
 <p align="center"><strong>Read the cycle. Compare the risk.</strong><br>
@@ -20,13 +18,18 @@ Learn sector rotation through Indian market returns, comparisons, and risk analy
 Explore Nifty50, sectoral, mid/small-cap and thematic indices in a browser.
 No account or installation is needed to use the published dashboard.
 
-[Static banner](docs/brand.png) · [Dashboard](#dashboard) · [Comparison modes](#comparison-modes) · [Data and year rollover](#data-and-year-rollover) · [Methodology](#methodology) · [Local setup](#local-setup)
+[Dashboard](#dashboard) · [Comparison modes](#comparison-modes) · [Data and year rollover](#data-and-year-rollover) · [Methodology](#methodology) · [Local setup](#local-setup)
 
 > A research and learning tool, not a trading forecast or investment recommendation.
 
 ## Dashboard
 
-![Current comparison dashboard with controls inside the graph](docs/compare.png)
+![Desktop walkthrough of sector comparisons, returns, risk, rankings and exports](docs/tutorial.gif)
+
+The 18-chapter walkthrough uses the real desktop dashboard, with captions and highlighted
+controls: individual returns, comparison modes, year filters, sharing, rankings,
+the annual heatmap, and CSV/PNG exports. It loops automatically; the captions and
+highlights are tutorial annotations, not part of the application.
 
 ### Compare Sectors
 
@@ -46,18 +49,11 @@ Search the sidebar or select an index to open its page. Each page includes:
 - Quarterly and annual return histograms, with current-year annual values labelled **YTD**.
 - YTD, previous-year return, 3Y / 5Y / 10Y CAGR, best/worst year, up-year frequency and annual volatility.
 - A colour-graded returns table, with a **3Y / 5Y / 10Y CAGR** selector.
-- Year-range filters, CSV download and a detailed per-index refresh status.
+- Year-range filters and CSV download.
 
 Missing or unfinished values remain blank. Stat tiles retain their full-history
 definitions when the chart/table range changes. The fixed five-year average row
 is shown only when the full year range is selected.
-
-<details>
-<summary>Preview an index page</summary>
-
-![Index page with quarterly returns and in-graph navigation icons](docs/asset.png)
-
-</details>
 
 ### Summary
 
@@ -73,13 +69,6 @@ heatmap and an automatically generated historical performance write-up.
 
 Summary always uses all available data. The heuristic commentary is based on
 past observations, **not a forecast**.
-
-<details>
-<summary>Preview the sortable rankings</summary>
-
-![Current Summary index rankings](docs/summary.png)
-
-</details>
 
 ## Comparison modes
 
@@ -131,37 +120,20 @@ or through **Actions > Refresh data and deploy > Run workflow**.
 The workflow fetches returns, exports website data, commits workbook changes
 when returns or refresh metadata change, and deploys GitHub Pages.
 
-### What happens in 2027?
+### What happens next year?
 
 **Year labels advance automatically after a new export and deployment.**
-The export uses its actual calendar year, rather than a hard-coded 2026 label.
-When the source supplies a 2027 row, it appears as **2027 YTD**. The 2026 row or
-heatmap column becomes **2026**, and ranking/stat labels move to 2027 YTD and
-the previous year, 2026. Year selectors expand to include the supplied years.
+The export uses its actual calendar year, rather than a hard-coded year.
+When the source supplies a new-year row, it appears as that year's **YTD**.
+The outgoing year becomes a completed-year row or heatmap column, and ranking/stat
+labels move to the new current year and previous year. Year selectors expand to
+include the supplied years. This applies to each future year without annual code changes.
 
 This is **not a midnight update** in an already-open browser. It requires a
 new export/deployment and a page reload. Missing source years are not invented;
-an index without a 2027 source row will have no 2027 return yet. Completed 2026
-results also depend on the source having supplied the final values. A saved
-comparison with explicit 2026 end dates intentionally keeps that range until changed.
-
-### Freshness is visible
-
-The dashboard shows the export date and latest available quarter, alongside
-per-index status indicators in the sidebar and comparison list. Asset pages
-show the recorded last successful refresh and last attempt.
-
-| Indicator | Meaning |
-|---|---|
-| Green | A recent successful source fetch was recorded. |
-| Amber | Cached data follows a failed attempt, or the last success is over 45 days old. |
-| Grey | No reliable per-index refresh date has been recorded. |
-
-Older workbooks remain **unknown** until a refresh is recorded. Exporting data
-does not create a source refresh date. A successful fetch records when the source
-was accessed, not when the provider last updated every observation. Failed fetches
-retain prior returns and last-success dates; an index with no usable history
-causes export to abort rather than publish an empty series.
+an index without a new-year source row has no new-year return yet. Completed
+previous-year results also depend on the source having supplied the final values.
+A saved comparison with explicit end dates intentionally keeps that range until changed.
 
 ## Methodology
 
@@ -227,7 +199,7 @@ git diff --check
 ```
 
 Tests cover return calculations, comparison modes, rankings, export metadata,
-share links, refresh fallbacks and 2027 rollover. Python tests use mocked requests
+share links, refresh fallbacks and year rollover. Python tests use mocked requests
 and temporary workbooks; they do not fetch live data or modify the real workbook.
 
 ### Recreating the artwork
@@ -239,12 +211,16 @@ to run the dashboard. The default font path is DejaVu Sans Bold on Linux.
 ```bash
 python -m pip install Pillow
 python3 docs/make_banner.py
-# Optional ImageMagick optimization:
 convert docs/brand.gif -layers Optimize docs/brand.gif
 ```
 
 Use `--font /path/to/font.ttf` for a different font location. The generator
-produces both the animated [banner](docs/brand.gif) and a [static alternative](docs/brand.png).
+produces an optional animated banner and the static [header artwork](docs/brand.png)
+used above. The desktop tutorial is the README's only embedded animation.
+
+The tutorial assembler is [docs/make_tutorial.py](docs/make_tutorial.py). It uses
+1440×900 screenshots of actual browser states, then adds captions and instructional
+callouts; raw recording frames are not part of the deployment or repository.
 
 ## Contribute and support
 

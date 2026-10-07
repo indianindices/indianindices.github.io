@@ -147,7 +147,8 @@ function refreshInfo(name, now = Date.now()) {
 
 function refreshDot(name) {
   const info = refreshInfo(name);
-  return `<span class="refresh-dot ${info.kind}" role="img" aria-label="${esc(info.label)}" title="${esc(`${info.label} · ${info.detail}`)}"></span>`;
+  const labels = { fresh: "Source data: recently retrieved", cached: "Source data: saved history", stale: "Source data: older history", unavailable: "Source data: unavailable", unknown: "Source data: date not recorded" };
+  return `<span class="refresh-dot ${info.kind}" role="img" aria-label="${labels[info.kind]}" title="${labels[info.kind]}"></span>`;
 }
 
 function renderAsset(name, keepZoom = false) {
@@ -156,9 +157,6 @@ function renderAsset(name, keepZoom = false) {
   const s = state.stats[name];
   const cy = state.data.currentYear;
   $("#assetTitle").textContent = name;
-  const freshness = refreshInfo(name);
-  $("#assetFreshness").className = `index-freshness ${freshness.kind}`;
-  $("#assetFreshness").textContent = `${freshness.label} · ${freshness.detail}`;
 
   const chip = (label, v, note = "") => `<div class="chip"><small>${label}</small><strong class="${cls(v)}">${fmt(v)}</strong>${note ? `<em>${note}</em>` : ""}</div>`;
   $("#assetStats").innerHTML = [

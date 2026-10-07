@@ -243,3 +243,16 @@ test("2027 labels advance YTD while 2026 becomes a past year", () => {
   assert.equal(app.run("assetPeriodLabel({year:2027,month:12})"), "2027 YTD");
   assert.equal(app.run('state.stats.Nifty50.last'), 14.7);
 });
+
+test("public source hints omit refresh failure details and timestamps", () => {
+  const app = setup();
+  app.run('state.data.refresh = {Nifty50:{status:"cached",lastSuccess:null,lastAttempt:"2026-10-07"}}');
+  const hint = app.run('refreshDot("Nifty50")');
+  assert.ok(hint.includes("saved history"));
+  assert.ok(!hint.includes("failed refresh"));
+  assert.ok(!hint.includes("last attempt"));
+  assert.ok(!hint.includes("2026-10-07"));
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.ok(!html.includes('id="assetFreshness"'));
+  app.run('delete state.data.refresh');
+});
