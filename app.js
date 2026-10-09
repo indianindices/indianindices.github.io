@@ -734,7 +734,7 @@ function route() {
   let hash;
   try { hash = decodeURIComponent(path); } catch { hash = ""; }
   const params = new URLSearchParams(separator < 0 ? "" : raw.slice(separator + 1));
-  const name = hash.startsWith("asset/") ? hash.slice(6) : null;
+  const name = hash === "support" ? state.asset || state.names[0] : hash.startsWith("asset/") ? hash.slice(6) : null;
   $("#compareView").hidden = hash !== "compare";
   if (name && state.data.assets[name]) {
     state.view = "asset";
@@ -748,7 +748,7 @@ function route() {
     $("#assetView").hidden = true;
     $("#summaryView").hidden = true;
     renderCompare();
-  } else if (hash === "summary") {
+  } else if (hash === "summary" || hash === "support") {
     state.view = "summary";
     $("#assetView").hidden = true;
     $("#summaryView").hidden = false;
