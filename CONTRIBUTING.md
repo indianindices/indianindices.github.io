@@ -7,8 +7,8 @@ the scope and calculation methodology.
 
 ## Local setup
 
-Use Python 3.12 (the version used by CI), Node.js 18 or newer for the regression
-tests, and a modern browser. No npm install or frontend build step is needed.
+Use Python 3.12 (the version used by CI), Node.js 22 or newer for public
+configuration and regression tests, and a modern browser. No npm install is needed.
 
 Fork the repository on GitHub, then run:
 
@@ -42,7 +42,7 @@ the workbook. Do not include unrelated workbook changes in a pull request.
 ## Checks before a pull request
 
 ```bash
-node --test tests/app.test.cjs
+node --test tests/*.test.cjs
 python3 -m unittest discover -s tests -p 'test_*.py'
 git diff --check
 git status --short
@@ -70,6 +70,9 @@ Include screenshots for visual changes and regression tests for changed logic.
 - Keep data fetching respectful of source terms and rate limits. Do not bypass authentication.
 - Never commit API keys, cookies, tokens, private keys or personal financial data.
   Report credential exposures privately to a maintainer, not in a public issue.
+- Supabase's publishable/legacy anon key is intentionally browser-visible. Never
+  use a secret or service-role key. Preserve waitlist RLS and write-only RPC permissions;
+  use the private Supabase dashboard for signup data and metrics.
 - Generated JSON and local environment files are ignored; do not force-add them.
 - If adding a site asset, include it in the Pages workflow's staging step.
 

@@ -174,7 +174,9 @@ test("rolling CAGR uses complete lookbacks before the filtered endpoint range", 
 });
 
 test("freshness distinguishes missing metadata, cached failures and overdue sources", () => {
-  const app = setup();
+  const app = setup({ currentYear: 2026, assets: {
+    Nifty50: [{ year: 2025, q: [1, 2, 3, 4], annual: 10 }],
+  } });
   assert.equal(app.run('refreshInfo("Nifty50").kind'), "unknown");
   app.run('state.data.refresh = {Nifty50: {lastSuccess: "2026-10-01", lastAttempt: "2026-10-07", status: "fresh"}}');
   assert.equal(app.run('refreshInfo("Nifty50", Date.parse("2026-10-07")).kind'), "fresh");
@@ -184,6 +186,17 @@ test("freshness distinguishes missing metadata, cached failures and overdue sour
   app.run('state.data.refresh.Nifty50.lastSuccess = null');
   assert.ok(app.run('refreshInfo("Nifty50").detail').includes("unknown"));
   app.run('delete state.data.refresh');
+});
+
+test("support deep links render the dashboard without rewriting the support hash", () => {
+  const app = setup();
+  app.context.location = { hash: "#support" };
+  app.context.window = { scrollTo() {} };
+  app.run("renderSidebar = () => {}; route()");
+  assert.equal(app.context.location.hash, "#support");
+  assert.equal(app.run("state.view"), "asset");
+  assert.equal(app.run("state.asset"), realData.assets.Nifty50 ? "Nifty50" : Object.keys(realData.assets)[0]);
+  assert.equal(app.run('document.querySelector("#assetView").hidden'), false);
 });
 
 test("drawdowns and recovery durations track regained and unrecovered peaks", () => {
@@ -255,4 +268,20 @@ test("public source hints omit refresh failure details and timestamps", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   assert.ok(!html.includes('id="assetFreshness"'));
   app.run('delete state.data.refresh');
+});
+
+test("dashboard footer links to a deployed standalone methodology page", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const page = fs.readFileSync(path.join(root, "methodology.html"), "utf8");
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  assert.ok(html.indexOf('<footer class="data-meta">') > html.indexOf('id="summaryView"'));
+  assert.match(html, /<footer class="data-meta">\s*<span id="freshness"><\/span>\s*<a href="methodology.html">Data &amp; methodology<\/a>\s*<\/footer>\s*<\/main>/);
+  assert.ok(!html.includes('<details class="methodology">'));
+  assert.equal((page.match(/<dt>/g) || []).length, 9);
+  assert.match(page, /href="index.html">Back to dashboard/);
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
+    assert.match(fs.readFileSync(path.join(root, file), "utf8"), /cp index.html methodology.html /);
+  }
+  assert.match(readme, /<a href="https:\/\/indianindices.github.io\/">\s*<img src="docs\/brand.png"/);
+  assert.match(readme, /## Support IndianIndices[\s\S]*hosting, data, development and future improvements\.\s*$/);
 });

@@ -13,6 +13,9 @@ env/
 .env
 .env.*
 !.env.example
+supabase-config.js
+.preview/
+_site/
 
 # Jupyter
 .ipynb_checkpoints/

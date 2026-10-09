@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="docs/brand.png" alt="Indian Sectors: a mint bull and coral bear with market candles" width="1200">
+  <a href="https://indianindices.github.io/">
+    <img src="docs/brand.png" alt="Indian Sectors: a mint bull and coral bear with market candles" width="1200">
+  </a>
 </p>
 
 <p align="center"><strong>Read the cycle. Compare the risk.</strong><br>
@@ -148,7 +150,7 @@ A saved comparison with explicit end dates intentionally keeps that range until 
 | Summary risk-adjusted score | Mean annual return divided by annual volatility; **not a Sharpe ratio**. |
 
 Source rounding, available history and missing observations limit precision.
-The in-app **Data & methodology** section explains the calculations and assumptions.
+The dashboard footer links to the [Data & methodology page](https://indianindices.github.io/methodology.html), which explains the calculations and assumptions.
 
 ## How it works
 
@@ -175,8 +177,8 @@ The in-graph and export icons are bundled [Lucide](https://lucide.dev/) assets.
 
 ## Local setup
 
-Use Python with the project requirements (CI uses Python 3.12). Node.js 18+
-is needed only for the JavaScript tests; no npm install or frontend build is required.
+Use Python with the project requirements (CI uses Python 3.12) and Node.js 22+
+for public configuration generation and JavaScript tests. No npm install is required.
 
 ```bash
 python3 -m venv .venv
@@ -193,13 +195,14 @@ the workbook; ordinary startup exports the existing workbook without fetching.
 ### Checks
 
 ```bash
-node --test tests/app.test.cjs
+node --test tests/*.test.cjs
 python3 -m unittest discover -s tests -p 'test_*.py'
 git diff --check
 ```
 
 Tests cover return calculations, comparison modes, rankings, export metadata,
-share links, refresh fallbacks and year rollover. Python tests use mocked requests
+share links, refresh fallbacks, year rollover, waitlist requests and safe public
+configuration generation. Python tests use mocked requests
 and temporary workbooks; they do not fetch live data or modify the real workbook.
 
 ### Recreating the artwork
@@ -230,3 +233,11 @@ guidelines. Report bugs through [GitHub Issues](https://github.com/indianindices
 Use the repository's **Sponsor** button to support the project.
 
 **Past performance does not predict future returns. This project is not investment advice.**
+
+## Support IndianIndices
+
+If you find IndianIndices useful, you can [contribute](CONTRIBUTING.md) or
+use the dashboard's **Support** button for UPI payments from India or PayPal
+internationally. You can also support the project through the repository's
+**Sponsor** button. Your support
+helps cover hosting, data, development and future improvements.

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data &amp; Methodology | Indian Sectors</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="methodology-page">
+  <main>
+    <nav class="methodology-nav" aria-label="Site">
+      <a class="brand" href="index.html">Indian<span>Sectors</span></a>
+      <a href="index.html">Back to dashboard</a>
+    </nav>
+    <h1>Data &amp; methodology</h1>
+    <dl class="methodology">
+      <dt>Source</dt><dd><a href="https://trendlyne.com/" target="_blank" rel="noopener noreferrer">Trendlyne</a>. Exports refresh monthly; an export date is not a guarantee of fresh source data for every index. Per-index indicators distinguish successful refreshes, cached data after a failed attempt, overdue refreshes and unknown dates. Older workbooks show unknown until a refresh is recorded.</dd>
+      <dt>Returns</dt><dd>Calendar-year and quarterly index returns. The current year's annual value is YTD, not a completed year. Blank values mean unavailable or unfinished periods.</dd>
+      <dt>Growth of &#8377;10,000</dt><dd>Quarterly compounding on the latest uninterrupted history shared by all selected indices. Each line starts at &#8377;10,000 immediately before the first included quarter. Only completed quarters are included; the result can differ from the latest annual YTD value. Changing the selection or range resets the common starting date.</dd>
+      <dt>Assumptions</dt><dd>Hypothetical index growth, not an investable portfolio. No fees, taxes or additional cash flows; dividends are not added separately.</dd>
+      <dt>CAGR</dt><dd>Stat tiles use the last 4 &times; N available consecutive quarterly returns. Historical table values compound N calendar years; current-year CAGR ends at the last available completed quarter.</dd>
+      <dt>Comparison metrics</dt><dd>Excess return is the annual index return minus Nifty50's same-year return, in percentage points. Rolling 3Y and 5Y CAGR use 12 and 20 consecutive completed quarters at each quarter-end; a missing quarter leaves a blank. Year filters select endpoints, not the lookback history. Curved lines interpolate between observations; they are not extra data points.</dd>
+      <dt>Drawdown and recovery</dt><dd>Quarter-end drawdown is the decline from the highest compounded value since the common starting date. Recovery counts quarters below that peak, resetting to zero once it is regained. The risk table reports the worst observed episode's peak-to-recovery duration, or marks it unrecovered. Daily and within-quarter losses are not measured; changing the range or selected indices resets the shared history and peak.</dd>
+      <dt>Statistics and filters</dt><dd>Best/worst year, up years and annual volatility use completed years across the full available history. Stat tiles are not changed by the chart/table year filters. The Summary view always uses all available data.</dd>
+      <dt>Risk</dt><dd>Annual volatility is sample standard deviation. The summary's risk-adjusted score is mean annual return divided by annual volatility, not a Sharpe ratio. Past performance does not predict future returns; this is not investment advice.</dd>
+    </dl>
+  </main>
+</body>
+</html>

@@ -8,9 +8,13 @@
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
-  <a class="repo-link" href="https://github.com/indianindices/indianindices.github.io" target="_blank" rel="noopener noreferrer" aria-label="View GitHub repository" title="View GitHub repository">
-    <img src="docs/github.svg" width="24" height="24" alt="">
-  </a>
+  <div class="site-actions">
+    <button id="openSupport" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><img src="docs/heart.svg" width="16" height="16" alt="">Support</button>
+    <button id="openWaitlist" type="button" aria-haspopup="dialog" aria-controls="waitlistDialog">Join Waitlist</button>
+    <a class="repo-link" href="https://github.com/indianindices/indianindices.github.io" target="_blank" rel="noopener noreferrer" aria-label="View GitHub repository" title="View GitHub repository">
+      <img src="docs/github.svg" width="24" height="24" alt="">
+    </a>
+  </div>
   <aside id="sidebar">
     <div class="brand">Indian<span>Sectors</span></div>
     <button id="compareBtn" class="nav summary">Compare Sectors</button>
@@ -20,24 +24,65 @@
     <div class="foot" id="foot"></div>
   </aside>
 
-  <main>
-    <div class="data-meta">
-      <span id="freshness"></span>
-      <details class="methodology">
-        <summary>Data &amp; methodology</summary>
+  <dialog id="waitlistDialog" aria-labelledby="premiumTitle">
+      <button id="closeWaitlist" type="button" aria-label="Close waitlist" title="Close waitlist"><img src="docs/x.svg" width="20" height="20" alt=""></button>
+      <div class="premium-copy">
+        <h2 id="premiumTitle">&#128640; Premium features coming soon</h2>
+        <p>Join the waitlist for:</p>
+        <ul>
+          <li>Sector rotation alerts</li>
+          <li>Relative strength rankings</li>
+          <li>Historical analytics</li>
+        </ul>
+      </div>
+      <div class="premium-signup">
+        <form id="waitlistForm">
+          <label for="waitlistEmail">Email Address</label>
+          <div class="waitlist-fields">
+            <input id="waitlistEmail" name="email" type="email" autocomplete="email" placeholder="Email Address" maxlength="254" required autofocus aria-describedby="waitlistConsent waitlistStatus">
+            <button id="waitlistSubmit" type="submit">Join Waitlist</button>
+          </div>
+          <p id="waitlistConsent">By joining, you agree to receive premium launch emails.</p>
+          <p id="waitlistStatus" role="status" aria-live="polite"></p>
+        </form>
+        <details class="waitlist-privacy">
+          <summary>Privacy</summary>
+          <p>We store your email in Supabase for premium launch updates. An anonymous ID saved in your browser counts visits and links signups to visits. We do not send page URLs or referrers with these requests. Clearing browser storage resets this ID. Contact the site owner to request email deletion.</p>
+        </details>
+      </div>
+  </dialog>
+
+  <dialog id="supportDialog" aria-labelledby="supportTitle">
+    <button id="closeSupport" type="button" aria-label="Close support" title="Close support" autofocus><img src="docs/x.svg" width="20" height="20" alt=""></button>
+    <h2 id="supportTitle">Support IndianIndices</h2>
+    <div class="support-options">
+      <section aria-labelledby="indiaSupportTitle">
+        <h3 id="indiaSupportTitle"><span aria-hidden="true">&#127470;&#127475;</span> Support from India</h3>
         <dl>
-          <dt>Source</dt><dd><a href="https://trendlyne.com/" target="_blank" rel="noopener noreferrer">Trendlyne</a>. Exports refresh monthly; an export date is not a guarantee of fresh source data for every index. Per-index indicators distinguish successful refreshes, cached data after a failed attempt, overdue refreshes and unknown dates. Older workbooks show unknown until a refresh is recorded.</dd>
-          <dt>Returns</dt><dd>Calendar-year and quarterly index returns. The current year's annual value is YTD, not a completed year. Blank values mean unavailable or unfinished periods.</dd>
-          <dt>Growth of &#8377;10,000</dt><dd>Quarterly compounding on the latest uninterrupted history shared by all selected indices. Each line starts at &#8377;10,000 immediately before the first included quarter. Only completed quarters are included; the result can differ from the latest annual YTD value. Changing the selection or range resets the common starting date.</dd>
-          <dt>Assumptions</dt><dd>Hypothetical index growth, not an investable portfolio. No fees, taxes or additional cash flows; dividends are not added separately.</dd>
-          <dt>CAGR</dt><dd>Stat tiles use the last 4 × N available consecutive quarterly returns. Historical table values compound N calendar years; current-year CAGR ends at the last available completed quarter.</dd>
-          <dt>Comparison metrics</dt><dd>Excess return is the annual index return minus Nifty50's same-year return, in percentage points. Rolling 3Y and 5Y CAGR use 12 and 20 consecutive completed quarters at each quarter-end; a missing quarter leaves a blank. Year filters select endpoints, not the lookback history. Curved lines interpolate between observations; they are not extra data points.</dd>
-          <dt>Drawdown and recovery</dt><dd>Quarter-end drawdown is the decline from the highest compounded value since the common starting date. Recovery counts quarters below that peak, resetting to zero once it is regained. The risk table reports the worst observed episode's peak-to-recovery duration, or marks it unrecovered. Daily and within-quarter losses are not measured; changing the range or selected indices resets the shared history and peak.</dd>
-          <dt>Statistics and filters</dt><dd>Best/worst year, up years and annual volatility use completed years across the full available history. Stat tiles are not changed by the chart/table year filters. The Summary view always uses all available data.</dd>
-          <dt>Risk</dt><dd>Annual volatility is sample standard deviation. The summary's risk-adjusted score is mean annual return divided by annual volatility, not a Sharpe ratio. Past performance does not predict future returns; this is not investment advice.</dd>
+          <dt>UPI</dt>
+          <dd><a href="upi://pay?pa=kavincsbi%40ybl">kavincsbi@ybl</a></dd>
         </dl>
-      </details>
+        <p class="support-apps">Google Pay &bull; PhonePe &bull; Paytm</p>
+        <a class="support-qr" href="docs/phonepe_gpay.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size UPI QR code">
+          <img src="docs/phonepe_gpay.jpeg" width="683" height="683" alt="UPI payment QR code for kavincsbi@ybl">
+        </a>
+      </section>
+      <section aria-labelledby="internationalSupportTitle">
+        <h3 id="internationalSupportTitle"><img src="docs/globe.svg" width="20" height="20" alt=""> International Support</h3>
+        <dl>
+          <dt>PayPal ID</dt>
+          <dd>kavinchandra</dd>
+          <dt>Direct link</dt>
+          <dd><a href="https://www.paypal.me/kavinchandra" target="_blank" rel="noopener noreferrer">paypal.me/kavinchandra</a></dd>
+        </dl>
+        <a class="support-qr" href="docs/paypal.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size PayPal QR code">
+          <img src="docs/paypal.jpeg" width="600" height="600" alt="PayPal support QR code for kavinchandra">
+        </a>
+      </section>
     </div>
+  </dialog>
+
+  <main>
     <section id="compareView" hidden>
       <h1>Compare Sectors</h1>
       <div class="range-controls" aria-label="Comparison date range">
@@ -156,8 +201,15 @@
         <div class="table-wrap"><table id="heatmap" class="grid heat"></table></div>
       </div>
     </section>
+    <footer class="data-meta">
+      <span id="freshness"></span>
+      <a href="methodology.html">Data &amp; methodology</a>
+    </footer>
   </main>
 
+  <script src="supabase-config.js"></script>
+  <script src="support.js"></script>
+  <script src="waitlist.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

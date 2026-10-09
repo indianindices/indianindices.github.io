@@ -61,11 +61,24 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Test dashboard and waitlist
+        run: node --test tests/*.test.cjs
+
+      - name: Generate public Supabase configuration
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: node scripts/generate-config.mjs _site/supabase-config.js
+
       - name: Stage site files
         run: |
           mkdir -p _site/docs
-          cp index.html app.js style.css data.json _site/
-          cp docs/github.svg docs/download.svg docs/plus.svg docs/minus.svg docs/maximize.svg _site/docs/
+          cp index.html methodology.html app.js waitlist.js support.js style.css data.json _site/
+          cp docs/github.svg docs/download.svg docs/plus.svg docs/minus.svg docs/maximize.svg docs/x.svg docs/heart.svg docs/globe.svg docs/phonepe_gpay.jpeg docs/paypal.jpeg _site/docs/
 
       - uses: actions/upload-pages-artifact@v3
         with:
