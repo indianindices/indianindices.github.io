@@ -9,8 +9,9 @@ if [[ "${1:-}" == "--refresh" ]]; then
   "$PYTHON" build_sectoraldata.py
 fi
 "$PYTHON" export_data.py
-mkdir -p .preview/docs
-cp index.html methodology.html app.js waitlist.js support.js style.css data.json .preview/
+mkdir -p .preview/docs .preview/vendor
+cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js waitlist.js support.js style.css data.json LICENSE NOTICE .preview/
+cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE .preview/vendor/
 cp docs/*.svg .preview/docs/
 cp docs/phonepe_gpay.jpeg docs/paypal.jpeg .preview/docs/
 node scripts/generate-config.mjs .preview/supabase-config.js
