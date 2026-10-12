@@ -1,7 +1,23 @@
 const LC = LightweightCharts;
 const QEND = [[3, 31], [6, 30], [9, 30], [12, 31]];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const $ = (s) => document.querySelector(s);
-const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", compareNames: [], compareMode: "returns", fromYear: null, toYear: null, rankingSort: { key: "cagr5", direction: "desc" } };
+const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", tablePeriod: "quarterly", heatmapPeriod: "annual", heatmapYear: null, summaryTab: "heatmap", compareNames: [], compareMode: "returns", fromYear: null, toYear: null, rankingSort: { key: "cagr5", direction: "desc" } };
+const UI_SUBSECTIONS = { assets: ["stats", "chart", "returnsTable"], compare: ["returns", "growth", "excess", "rolling3", "rolling5", "drawdown", "recovery"], marketOverview: ["heatmap", "returns", "cagr"], calculator: ["sip", "lumpsum", "swp"], research: ["quality", "screener", "portfolio"] };
+
+function enabledUiSubsections(section) {
+  if (UI_CONFIG.sections?.[section] === false) return [];
+  return (UI_SUBSECTIONS[section] ?? []).filter((name) => UI_CONFIG.subsections?.[section]?.[name] !== false);
+}
+
+function uiSectionEnabled(section) {
+  return UI_CONFIG.sections?.[section] !== false && enabledUiSubsections(section).length > 0;
+}
+
+function applyUiConfig() {
+  const visibility = { "#summaryBtn": "marketOverview", "#calculatorBtn": "calculator", "#compareBtn": "compare", "#researchBtn": "research", "#search": "assets", "#assetList": "assets" };
+  Object.entries(visibility).forEach(([selector, section]) => ($(selector).hidden = !uiSectionEnabled(section)));
+}
 
 const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`);
 const cls = (v) => (v == null ? "" : v >= 0 ? "pos" : "neg");
@@ -101,7 +117,19 @@ function fit(chart) {
 // ---------- asset view ----------
 function assetPeriodLabel(time) {
   const year = yearOf(time);
+  if (state.returnPeriod === "monthly") return `${MONTHS[monthOf(time) - 1]} ${year}`;
   return state.returnPeriod === "annual" ? `${year}${year === state.data.currentYear ? " YTD" : ""}` : `${year} Q${Math.ceil(monthOf(time) / 3)}`;
+}
+
+function periodRows(name, period) {
+  return period === "monthly" ? state.data.monthlyAssets?.[name] ?? [] : state.data.assets[name];
+}
+
+function periodStatus(name, period, rows) {
+  const available = rows.some((row) => !row.avg && (period === "annual" ? row.annual != null : (period === "monthly" ? row.m : row.q).some((value) => value != null)));
+  if (!available) return "No completed returns available for this period and range.";
+  const info = refreshInfo(name, Date.now(), period);
+  return ["cached", "stale", "unavailable", "unknown"].includes(info.kind) ? `${info.label} · ${info.detail}` : "";
 }
 
 function ensureAssetChart() {
@@ -134,8 +162,8 @@ function ensureAssetChart() {
   return state.charts.asset;
 }
 
-function refreshInfo(name, now = Date.now()) {
-  const record = state.data.refresh?.[name];
+function refreshInfo(name, now = Date.now(), period = "quarterly") {
+  const record = (period === "monthly" ? state.data.monthlyRefresh : state.data.refresh)?.[name];
   const success = record?.lastSuccess && Number.isFinite(Date.parse(record.lastSuccess)) ? record.lastSuccess : null;
   const detail = `Last successful refresh ${success ?? "unknown"} · last attempt ${record?.lastAttempt ?? "unknown"}`;
   if (record?.status === "cached") return { kind: "cached", label: "Cached data after failed refresh", detail };
@@ -145,15 +173,20 @@ function refreshInfo(name, now = Date.now()) {
   return { kind: "fresh", label: `Refreshed ${success}`, detail };
 }
 
-function refreshDot(name) {
-  const info = refreshInfo(name);
+function refreshDot(name, period = "quarterly") {
+  const info = refreshInfo(name, Date.now(), period);
   const labels = { fresh: "Source data: recently retrieved", cached: "Source data: saved history", stale: "Source data: older history", unavailable: "Source data: unavailable", unknown: "Source data: date not recorded" };
   return `<span class="refresh-dot ${info.kind}" role="img" aria-label="${labels[info.kind]}" title="${labels[info.kind]}"></span>`;
 }
 
 function renderAsset(name, keepZoom = false) {
+  const blocks = enabledUiSubsections("assets");
+  $("#assetStats").hidden = !blocks.includes("stats");
+  $("#assetChartBlock").hidden = !blocks.includes("chart");
+  $("#assetTableBlock").hidden = !blocks.includes("returnsTable");
+  $("#assetRangeControls").hidden = !blocks.includes("chart") && !blocks.includes("returnsTable");
+  $("#assetView .download-csv").hidden = !blocks.includes("returnsTable");
   const rows = state.data.assets[name];
-  const displayed = rows.filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear);
   const s = state.stats[name];
   const cy = state.data.currentYear;
   $("#assetTitle").textContent = name;
@@ -171,24 +204,29 @@ function renderAsset(name, keepZoom = false) {
     `<div class="chip"><small>Volatility (σ)</small><strong>${s.sd == null ? "—" : s.sd.toFixed(1) + "%"}</strong></div>`,
   ].join("");
 
-  const { chart, series } = ensureAssetChart();
-  const annual = state.returnPeriod === "annual";
-  $("#assetTip").hidden = true;
-  document.querySelectorAll("#returnPeriod button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.period === state.returnPeriod)));
-  chart.applyOptions({
-    timeScale: { tickMarkFormatter: (time, type) => annual ? assetPeriodLabel(time) : type === LC.TickMarkType.Year ? String(yearOf(time)) : `Q${Math.ceil(monthOf(time) / 3)} '${String(yearOf(time)).slice(2)}` },
-    localization: { timeFormatter: assetPeriodLabel },
-  });
-  const points = displayed
-    .flatMap((r) => annual
-      ? r.annual == null ? [] : [{ time: { year: r.year, month: 12, day: 31 }, value: r.annual, color: shade(r.annual, 40).hex }]
-      : r.q.map((v, i) => (v == null ? null : { time: { year: r.year, month: QEND[i][0], day: QEND[i][1] }, value: v, color: shade(v, 15).hex })))
-    .filter(Boolean)
-    .sort((a, b) => a.time.year - b.time.year || a.time.month - b.time.month);
-  series.setData(points);
-  $("#assetView [data-act='png']").disabled = !points.length;
-  if (!keepZoom) requestAnimationFrame(() => fit(chart));
-
+  if (blocks.includes("chart")) {
+    const { chart, series } = ensureAssetChart();
+    const annual = state.returnPeriod === "annual";
+    const monthly = state.returnPeriod === "monthly";
+    const chartRows = periodRows(name, state.returnPeriod).filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear);
+    $("#assetTip").hidden = true;
+    document.querySelectorAll("#returnPeriod button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.period === state.returnPeriod)));
+    chart.applyOptions({
+      timeScale: { tickMarkFormatter: (time, type) => annual ? assetPeriodLabel(time) : type === LC.TickMarkType.Year ? String(yearOf(time)) : monthly ? `${MONTHS[monthOf(time) - 1]} '${String(yearOf(time)).slice(2)}` : `Q${Math.ceil(monthOf(time) / 3)} '${String(yearOf(time)).slice(2)}` },
+      localization: { timeFormatter: assetPeriodLabel },
+    });
+    const points = chartRows
+      .flatMap((r) => annual
+        ? r.annual == null ? [] : [{ time: { year: r.year, month: 12, day: 31 }, value: r.annual, color: shade(r.annual, 40).hex }]
+        : (monthly ? r.m : r.q).map((v, i) => (v == null ? null : { time: { year: r.year, month: monthly ? i + 1 : QEND[i][0], day: monthly ? new Date(Date.UTC(r.year, i + 1, 0)).getUTCDate() : QEND[i][1] }, value: v, color: shade(v, monthly ? 10 : 15).hex })))
+      .filter(Boolean)
+      .sort((a, b) => a.time.year - b.time.year || a.time.month - b.time.month);
+    series.setData(points);
+    $("#assetChartStatus").textContent = periodStatus(name, state.returnPeriod, chartRows);
+    $("#assetView [data-act='png']").disabled = !points.length;
+    if (!keepZoom) requestAnimationFrame(() => fit(chart));
+  }
+  if (!blocks.includes("returnsTable")) return;
   const annualByYear = Object.fromEntries(rows.filter((r) => !r.avg).map((r) => [r.year, r.annual]));
   const n = state.cagrYears;
   const rolling = (y) => {
@@ -200,14 +238,19 @@ function renderAsset(name, keepZoom = false) {
     }
     return (p ** (1 / n) - 1) * 100;
   };
-  const tableRows = state.fromYear === state.firstYear && state.toYear === state.lastYear ? rows : displayed;
+  const tableMonthly = state.tablePeriod === "monthly";
+  const sourceRows = periodRows(name, state.tablePeriod);
+  const tableRows = state.fromYear === state.firstYear && state.toYear === state.lastYear ? sourceRows : sourceRows.filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear);
+  document.querySelectorAll("#tablePeriod button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.period === state.tablePeriod)));
+  $("#assetTableStatus").textContent = periodStatus(name, state.tablePeriod, tableRows);
   const body = tableRows.map((r) => {
     const label = r.avg ? "5Y Avg" : r.year === cy ? `${r.year} YTD` : r.year;
     const tip = r.year === cy ? `title="Trailing ${n}Y to the last completed quarter"` : "";
-    return `<tr class="${r.avg ? "avg" : ""}"><td class="label">${label}</td>${r.q.map((v) => cell(v, 15)).join("")}${cell(r.annual, 40)}${r.avg ? '<td class="empty">—</td>' : cell(rolling(r.year), 25, tip)}</tr>`;
+    return `<tr class="${r.avg ? "avg" : ""}"><td class="label">${label}</td>${(tableMonthly ? r.m : r.q).map((v) => cell(v, tableMonthly ? 10 : 15)).join("")}${cell(r.annual, 40)}${r.avg ? '<td class="empty">—</td>' : cell(rolling(r.year), 25, tip)}</tr>`;
   }).join("");
   const options = [3, 5, 10].map((k) => `<option value="${k}" ${k === n ? "selected" : ""}>${k}Y CAGR</option>`).join("");
-  $("#assetTable").innerHTML = `<thead><tr><th>Year</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>Annual</th><th><select id="cagrSelect" class="th-select">${options}</select></th></tr></thead><tbody>${body}</tbody>`;
+  const headers = tableMonthly ? MONTHS : ["Q1", "Q2", "Q3", "Q4"];
+  $("#assetTable").innerHTML = `<thead><tr><th>Year</th>${headers.map((label) => `<th>${label}</th>`).join("")}<th>Annual</th><th><select id="cagrSelect" class="th-select" aria-label="Table CAGR window">${options}</select></th></tr></thead><tbody>${body}</tbody>`;
 }
 
 const money = (value) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
@@ -314,6 +357,9 @@ function ensureCompareChart() {
 }
 
 function renderCompare() {
+  const modes = enabledUiSubsections("compare");
+  if (!modes.includes(state.compareMode)) state.compareMode = modes[0];
+  if (!state.compareMode) return;
   const entry = ensureCompareChart();
   entry.lines.forEach((line) => entry.chart.removeSeries(line.series));
   entry.lines = [];
@@ -329,7 +375,10 @@ function renderCompare() {
   const compounded = growth || risk ? growthData(selected, state.fromYear, state.toYear) : null;
   const risks = risk ? riskData(compounded) : null;
   const formatter = duration ? (value) => `${Math.round(value)}q` : growth ? money : excess ? fmtPp : (value) => `${value.toFixed(2)}%`;
-  document.querySelectorAll("#compareMode button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.mode === state.compareMode)));
+  document.querySelectorAll("#compareMode button").forEach((button) => {
+    button.hidden = !modes.includes(button.dataset.mode);
+    button.setAttribute("aria-pressed", String(button.dataset.mode === state.compareMode));
+  });
   entry.chart.applyOptions({
     timeScale: { tickMarkFormatter: (time) => String(yearOf(time)) },
     localization: { priceFormatter: formatter, timeFormatter: (time) => growth || risk || rollingYears ? `${yearOf(time)} Q${Math.ceil(monthOf(time) / 3)}` : `${yearOf(time)}${yearOf(time) === state.data.currentYear ? " YTD" : ""}` },
@@ -418,9 +467,11 @@ function csvText(records) {
 
 function exportRecords() {
   if (state.view === "asset") {
-    return [["Index", "Year", "Period", "Q1 (%)", "Q2 (%)", "Q3 (%)", "Q4 (%)", "Annual return (%)"],
-      ...state.data.assets[state.asset].filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
-        .map((row) => [state.asset, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", ...row.q, row.annual])];
+    const monthly = state.tablePeriod === "monthly";
+    const headers = monthly ? MONTHS : ["Q1", "Q2", "Q3", "Q4"];
+    return [["Index", "Year", "Period", ...headers.map((label) => `${label} (%)`), "Annual return (%)"],
+      ...periodRows(state.asset, state.tablePeriod).filter((row) => !row.avg && row.year >= state.fromYear && row.year <= state.toYear)
+        .map((row) => [state.asset, row.year, row.year === state.data.currentYear ? "YTD" : "Full year", ...(monthly ? row.m : row.q), row.annual])];
   }
   const selected = state.names.filter((name) => state.compareNames.includes(name));
   if (state.compareMode === "drawdown" || state.compareMode === "recovery") {
@@ -455,7 +506,7 @@ function saveBlob(blob, filename) {
 }
 
 function downloadCsv() {
-  const name = state.view === "asset" ? state.asset : `comparison-${state.compareMode}`;
+  const name = state.view === "asset" ? `${state.asset}-${state.tablePeriod}` : `comparison-${state.compareMode}`;
   saveBlob(new Blob(["\uFEFF", csvText(exportRecords())], { type: "text/csv;charset=utf-8" }), `${name.replace(/[^a-z0-9_-]/gi, "_")}-${state.fromYear}-${state.toYear}.csv`);
 }
 
@@ -492,7 +543,7 @@ function createChartPng(view, info = chartExportInfo(view)) {
   const title = wrap(info.title);
   context.font = font(11);
   const subtitle = wrap(`${info.subtitle} · visible chart viewport · data exported ${state.data.generated}`);
-  const footer = wrap("Source: Trendlyne · Past performance does not predict future returns.");
+  const footer = wrap(info.footer || "Source: Trendlyne · Past performance does not predict future returns.");
   const headerHeight = padding + 30 * scale + title.length * 24 * scale + subtitle.length * 16 * scale + 12 * scale;
   const columns = snapshot.width >= 640 * scale ? 2 : 1;
   const legendHeight = Math.ceil(info.lines.length / columns) * 22 * scale;
@@ -615,11 +666,27 @@ function ensureSummaryChart() {
 }
 
 function renderSummary() {
-  const { chart } = ensureSummaryChart();
-  requestAnimationFrame(() => fit(chart));
-  renderSummaryText();
-  renderHeatmap();
-  renderRankings();
+  const tabs = enabledUiSubsections("marketOverview");
+  if (!tabs.includes(state.summaryTab)) state.summaryTab = tabs[0];
+  document.querySelectorAll("#summaryTabs [role='tab']").forEach((button) => {
+    const selected = button.dataset.tab === state.summaryTab;
+    button.hidden = !tabs.includes(button.dataset.tab);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
+  ["cagr", "heatmap", "returns"].forEach((tab) => {
+    $(`#summary-${tab}-panel`).hidden = tab !== state.summaryTab;
+  });
+  if (!state.summaryTab) return;
+  if (state.summaryTab === "returns") {
+    const { chart } = ensureSummaryChart();
+    requestAnimationFrame(() => fit(chart));
+  } else if (state.summaryTab === "heatmap") {
+    renderHeatmap();
+  } else {
+    renderRankings();
+    renderSummaryText();
+  }
 }
 
 function rankedNames(key = state.rankingSort.key, direction = state.rankingSort.direction) {
@@ -654,12 +721,25 @@ function renderRankings() {
 
 function renderHeatmap() {
   const cy = state.data.currentYear;
-  const years = [...new Set(state.names.flatMap((n) => state.data.assets[n].filter((r) => !r.avg).map((r) => r.year)))].sort((a, b) => b - a);
+  const period = state.heatmapPeriod;
+  const annual = period === "annual";
+  const monthly = period === "monthly";
+  const years = [...new Set(state.names.flatMap((name) => periodRows(name, period).filter((row) => !row.avg).map((row) => row.year)))].sort((a, b) => b - a);
+  if (!years.includes(state.heatmapYear)) state.heatmapYear = years[0] ?? null;
+  $("#heatmapYear").innerHTML = years.map((year) => `<option value="${year}" ${year === state.heatmapYear ? "selected" : ""}>${year}${year === cy ? " YTD" : ""}</option>`).join("");
+  $("#heatmapYearControl").hidden = annual;
+  document.querySelectorAll("#heatmapPeriod button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.period === period)));
+  $("#heatmapTitle").textContent = `${monthly ? "Monthly" : annual ? "Annual" : "Quarterly"} heatmap`;
+  $("#heatmapStatus").textContent = years.length ? "" : "No completed returns available for this period.";
   const order = [...state.names].sort((a, b) => (state.stats[b].cagr5 ?? -1e9) - (state.stats[a].cagr5 ?? -1e9));
-  const head = `<thead><tr><th>Asset</th><th>5Y CAGR</th>${years.map((y) => `<th>${y}${y === cy ? " YTD" : ""}</th>`).join("")}</tr></thead>`;
+  const headers = annual ? years.map((year) => `${year}${year === cy ? " YTD" : ""}`) : monthly ? MONTHS : ["Q1", "Q2", "Q3", "Q4"];
+  const head = `<thead><tr><th>Asset</th><th>5Y CAGR</th>${headers.map((label) => `<th>${label}</th>`).join("")}</tr></thead>`;
   const body = order.map((n) => {
-    const byYear = Object.fromEntries(state.data.assets[n].filter((r) => !r.avg).map((r) => [r.year, r.annual]));
-    return `<tr><td class="label" data-name="${esc(n)}">${esc(n)}</td>${cell(state.stats[n].cagr5, 25)}${years.map((y) => cell(byYear[y] ?? null, 40)).join("")}</tr>`;
+    const rows = periodRows(n, period).filter((row) => !row.avg);
+    const byYear = Object.fromEntries(rows.map((row) => [row.year, row.annual]));
+    const selected = rows.find((row) => row.year === state.heatmapYear);
+    const values = annual ? years.map((year) => byYear[year] ?? null) : selected?.[monthly ? "m" : "q"] ?? Array(monthly ? 12 : 4).fill(null);
+    return `<tr><td class="label" data-name="${esc(n)}">${esc(n)}${monthly ? refreshDot(n, period) : ""}</td>${cell(state.stats[n].cagr5, 25)}${values.map((value) => cell(value, monthly ? 10 : annual ? 40 : 15)).join("")}</tr>`;
   }).join("");
   $("#heatmap").innerHTML = head + `<tbody>${body}</tbody>`;
 }
@@ -715,6 +795,7 @@ function renderSummaryText() {
 
 // ---------- navigation ----------
 function renderSidebar() {
+  applyUiConfig();
   const q = $("#search").value.trim().toLowerCase();
   $("#assetList").innerHTML = state.names
     .filter((n) => n.toLowerCase().includes(q))
@@ -724,7 +805,9 @@ function renderSidebar() {
       return `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span><span class="nav-meta">${refreshDot(n)}${badge}</span></button>`;
     }).join("");
   $("#summaryBtn").classList.toggle("active", state.view === "summary");
+  $("#calculatorBtn").classList.toggle("active", state.view === "calculator");
   $("#compareBtn").classList.toggle("active", state.view === "compare");
+  $("#researchBtn").classList.toggle("active", state.view === "research");
 }
 
 function route() {
@@ -735,37 +818,82 @@ function route() {
   try { hash = decodeURIComponent(path); } catch { hash = ""; }
   const params = new URLSearchParams(separator < 0 ? "" : raw.slice(separator + 1));
   const name = hash === "support" ? state.asset || state.names[0] : hash.startsWith("asset/") ? hash.slice(6) : null;
-  $("#compareView").hidden = hash !== "compare";
-  if (name && state.data.assets[name]) {
+  const research = hash === "research" || hash.startsWith("research/");
+  const calculator = hash === "calculator" || hash.startsWith("calculator/");
+  const requested = name && state.data.assets[name] ? "assets" : hash === "compare" ? "compare" : calculator ? "calculator" : research ? "research" : hash === "summary" || hash === "support" ? "marketOverview" : null;
+  const available = ["assets", "marketOverview", "calculator", "compare", "research"].filter((section) => uiSectionEnabled(section) && (section !== "assets" || state.names.length));
+  const section = available.includes(requested) ? requested : available[0];
+  ["#assetView", "#summaryView", "#calculatorView", "#compareView", "#researchView"].forEach((selector) => ($(selector).hidden = true));
+  $("#noViews").hidden = !!section;
+  if (!section) {
+    state.view = null;
+    renderSidebar();
+    return;
+  }
+  if (section !== requested && hash !== "support") {
+    location.hash = section === "assets" ? `asset/${encodeURIComponent(state.names[0])}` : section === "marketOverview" ? "summary" : section === "calculator" ? `calculator/${enabledUiSubsections("calculator")[0]}` : section === "research" ? `research/${enabledUiSubsections("research")[0]}` : "compare";
+    return;
+  }
+  if (section === "assets") {
     state.view = "asset";
-    state.asset = name;
-    $("#summaryView").hidden = true;
+    state.asset = name || state.names[0];
     $("#assetView").hidden = false;
-    renderAsset(name);
-  } else if (hash === "compare") {
+    renderAsset(state.asset);
+  } else if (section === "compare") {
     state.view = "compare";
+    $("#compareView").hidden = false;
     applyCompareParams(params);
-    $("#assetView").hidden = true;
-    $("#summaryView").hidden = true;
     renderCompare();
-  } else if (hash === "summary" || hash === "support") {
+  } else if (section === "calculator") {
+    const modes = enabledUiSubsections("calculator");
+    const requestedMode = hash.split("/")[1];
+    if (requestedMode && !modes.includes(requestedMode)) { location.hash = `calculator/${modes[0]}`; return; }
+    state.view = "calculator";
+    $("#calculatorView").hidden = false;
+    renderCalculator(requestedMode || modes[0]);
+  } else if (section === "research") {
+    const tabs = enabledUiSubsections("research");
+    const requestedTab = hash.split("/")[1];
+    if (requestedTab && !tabs.includes(requestedTab)) {
+      location.hash = `research/${tabs[0]}`;
+      return;
+    }
+    state.view = "research";
+    $("#researchView").hidden = false;
+    renderResearch(hash.split("/")[1] || "quality");
+  } else {
     state.view = "summary";
-    $("#assetView").hidden = true;
     $("#summaryView").hidden = false;
     renderSummary();
-  } else {
-    location.hash = state.names.length ? `asset/${encodeURIComponent(state.names[0])}` : "summary";
-    return;
   }
   renderSidebar();
   window.scrollTo({ top: 0 });
 }
 
 function activeChart() {
+  if (state.view === "asset" && !enabledUiSubsections("assets").includes("chart")) return null;
+  if (state.view === "summary" && state.summaryTab !== "returns") return null;
+  if (state.view === "research") return researchState.tab === "portfolio" ? state.charts.portfolio?.chart : null;
   return state.charts[state.view]?.chart;
 }
 
 function bindUI() {
+  $("#summaryTabs").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-tab]");
+    if (!button || !enabledUiSubsections("marketOverview").includes(button.dataset.tab) || button.dataset.tab === state.summaryTab) return;
+    state.summaryTab = button.dataset.tab;
+    renderSummary();
+  });
+  $("#summaryTabs").addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const buttons = [...document.querySelectorAll("#summaryTabs [role='tab']")].filter((button) => !button.hidden);
+    const current = buttons.indexOf(event.target);
+    if (current < 0) return;
+    event.preventDefault();
+    const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+    buttons[next].click();
+    buttons[next].focus();
+  });
   $("#rankings").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-sort]");
     if (!button) return;
@@ -773,7 +901,7 @@ function bindUI() {
     state.rankingSort = { key, direction: state.rankingSort.key === key ? state.rankingSort.direction === "asc" ? "desc" : "asc" : key === "sd" || key === "name" ? "asc" : "desc" };
     renderRankings();
   });
-  document.querySelectorAll(".range-controls select").forEach((select) => select.addEventListener("change", () => {
+  document.querySelectorAll(".range-controls .from-year, .range-controls .to-year").forEach((select) => select.addEventListener("change", () => {
     if (select.classList.contains("from-year")) {
       state.fromYear = +select.value;
       state.toYear = Math.max(state.fromYear, state.toYear);
@@ -792,7 +920,7 @@ function bindUI() {
   $("#copyCompareLink").addEventListener("click", copyCompareLink);
   $("#compareMode").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-mode]");
-    if (!button || button.dataset.mode === state.compareMode) return;
+    if (!button || !enabledUiSubsections("compare").includes(button.dataset.mode) || button.dataset.mode === state.compareMode) return;
     state.compareMode = button.dataset.mode;
     renderCompare();
   });
@@ -815,7 +943,24 @@ function bindUI() {
     const button = e.target.closest("button[data-period]");
     if (!button || button.dataset.period === state.returnPeriod) return;
     state.returnPeriod = button.dataset.period;
+    if (state.returnPeriod !== "annual") state.tablePeriod = state.returnPeriod;
     renderAsset(state.asset);
+  });
+  $("#tablePeriod").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-period]");
+    if (!button || button.dataset.period === state.tablePeriod) return;
+    state.tablePeriod = button.dataset.period;
+    renderAsset(state.asset, true);
+  });
+  $("#heatmapPeriod").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-period]");
+    if (!button || button.dataset.period === state.heatmapPeriod) return;
+    state.heatmapPeriod = button.dataset.period;
+    renderHeatmap();
+  });
+  $("#heatmapYear").addEventListener("change", (event) => {
+    state.heatmapYear = +event.target.value;
+    renderHeatmap();
   });
   $("#assetTable").addEventListener("change", (e) => {
     if (e.target.id !== "cagrSelect") return;
@@ -853,13 +998,14 @@ function bindUI() {
 }
 
 async function init() {
+  applyUiConfig();
   const res = await fetch("data.json", { cache: "no-store" });
   state.data = await res.json();
   state.names = Object.keys(state.data.assets);
-  const years = [...new Set(state.names.flatMap((name) => state.data.assets[name].filter((row) => !row.avg).map((row) => row.year)))].sort((left, right) => left - right);
+  const years = [...new Set(state.names.flatMap((name) => [...state.data.assets[name], ...(state.data.monthlyAssets?.[name] ?? [])].filter((row) => !row.avg).map((row) => row.year)))].sort((left, right) => left - right);
   state.firstYear = state.fromYear = years[0];
   state.lastYear = state.toYear = years[years.length - 1];
-  document.querySelectorAll(".range-controls select").forEach((select) => {
+  document.querySelectorAll(".range-controls .from-year, .range-controls .to-year").forEach((select) => {
     select.innerHTML = years.map((year) => `<option value="${year}">${year}</option>`).join("");
     select.value = select.classList.contains("from-year") ? state.fromYear : state.toYear;
   });
@@ -869,6 +1015,8 @@ async function init() {
   state.asOf = `Q${(lastQ % 4) + 1} ${Math.floor(lastQ / 4)}`;
   const ageDays = (Date.now() - Date.parse(state.data.generated)) / 86400000;
   $("#freshness").textContent = `Data exported ${state.data.generated} · latest available quarter ${state.asOf}${ageDays > 45 ? " · export over 45 days old" : ""}`;
+  const lastMonth = Math.max(...state.names.flatMap((name) => (state.data.monthlyAssets?.[name] ?? []).filter((row) => !row.avg).flatMap((row) => row.m.map((value, index) => value == null ? -1 : row.year * 12 + index))));
+  if (lastMonth >= 0) $("#freshness").textContent += ` · latest available month ${MONTHS[lastMonth % 12]} ${Math.floor(lastMonth / 12)}`;
   const warnings = state.names.filter((name) => ["cached", "stale", "unavailable"].includes(refreshInfo(name).kind)).length;
   const unknown = state.names.filter((name) => refreshInfo(name).kind === "unknown").length;
   if (warnings) $("#freshness").textContent += ` · ${warnings} indices need refresh attention`;
@@ -876,6 +1024,10 @@ async function init() {
   $("#freshness").classList.toggle("stale", ageDays > 45 || warnings > 0);
   state.names.forEach((n) => (state.stats[n] = computeStats(state.data.assets[n])));
   $("#foot").textContent = `Data exported ${state.data.generated}`;
+  if (uiSectionEnabled("research")) initResearch();
+  if (uiSectionEnabled("calculator")) initCalculator();
+  bindCalculator();
+  bindResearch();
   bindUI();
   route();
 }
