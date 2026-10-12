@@ -2,7 +2,7 @@ name: Refresh data and deploy
 
 on:
   schedule:
-    - cron: "30 1 3 * *" # 3rd of every month, 07:00 IST (picks up each quarter close)
+    - cron: "30 1 3 * *" # 3rd of every month, 07:00 IST (picks up month and quarter closes)
   workflow_dispatch:
   push:
     branches: [main]
@@ -46,13 +46,16 @@ jobs:
       - name: Export JSON for the website
         run: python export_data.py
 
+      - name: Test data refresh and export
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
       - name: Commit refreshed workbook if data or refresh status changed
         continue-on-error: true
         run: |
-          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(o['assets']==n['assets'] and o.get('refresh')==n.get('refresh'))"; then
+          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(all(o.get(k)==n.get(k) for k in ('assets','refresh','monthlyAssets','monthlyRefresh')))"; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add sectoraldata.xlsx
+            git add data/sectoraldata.xlsx
             git commit -m "Refresh sector data $(date -u +%F)"
             git push
           else
@@ -76,8 +79,9 @@ jobs:
 
       - name: Stage site files
         run: |
-          mkdir -p _site/docs
-          cp index.html methodology.html app.js waitlist.js support.js style.css data.json _site/
+          mkdir -p _site/docs _site/vendor
+          cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js waitlist.js support.js style.css data.json LICENSE NOTICE _site/
+          cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE _site/vendor/
           cp docs/github.svg docs/download.svg docs/plus.svg docs/minus.svg docs/maximize.svg docs/x.svg docs/heart.svg docs/globe.svg docs/phonepe_gpay.jpeg docs/paypal.jpeg _site/docs/
 
       - uses: actions/upload-pages-artifact@v3
