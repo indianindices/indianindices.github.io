@@ -13,9 +13,12 @@ from openpyxl.utils import get_column_letter
 
 
 ROOT = Path(__file__).parent
-CSV_PATH = ROOT / "sectoraldata.csv"
-XLSX_PATH = ROOT / "sectoraldata.xlsx"
+CSV_PATH = ROOT / "data" / "sectoraldata.csv"
+XLSX_PATH = ROOT / "data" / "sectoraldata.xlsx"
 METADATA_SHEET = "_RefreshStatus"
+MONTHLY_SHEET = "_MonthlyReturns"
+MONTHLY_METADATA_SHEET = "_MonthlyRefreshStatus"
+RESERVED_SHEETS = {METADATA_SHEET, MONTHLY_SHEET, MONTHLY_METADATA_SHEET}
 
 REQUESTED = [
     "Nifty50", "Next50", "IT", "Infra", "Consumption", "Energy", "Healthcare", "Pharma",
@@ -91,7 +94,7 @@ def quarterly_returns(symbol):
     return sorted(result, reverse=True)
 
 
-def trendlyne_quarterly_returns(index_id):
+def trendlyne_returns(index_id):
     response = requests.get(
         f"https://trendlyne.com/share-price/price-performance-analysis/{index_id}",
         headers={
@@ -101,14 +104,17 @@ def trendlyne_quarterly_returns(index_id):
         timeout=30,
     )
     response.raise_for_status()
-    payload = response.json()["body"]["returnsPatternData"]["Quarterly"]
-    rows = []
-    for year, values in payload.items():
-        quarter_values = {item["m"]: item["v"] for item in values if "m" in item}
-        annual = next(item["v"] for item in values if "y" in item)
-        label = "5Yr Avg" if year == "5Yr Avg" else int(year)
-        rows.append([label, *[quarter_values.get(month, 0) for month in (3, 6, 9, 12)], annual])
-    return rows
+    payload = response.json()["body"]["returnsPatternData"]
+    result = {}
+    for period, months in [("Quarterly", (3, 6, 9, 12)), ("Monthly", range(1, 13))]:
+        rows = []
+        for year, values in payload.get(period, {}).items():
+            period_values = {item["m"]: item["v"] for item in values if "m" in item}
+            annual = next((item["v"] for item in values if "y" in item), None)
+            label = "5Yr Avg" if year == "5Yr Avg" else int(year)
+            rows.append([label, *[period_values.get(month) for month in months], annual])
+        result[period.lower()] = rows
+    return result
 
 
 def write_sheet(workbook, name, rows, note=None):
@@ -136,7 +142,7 @@ def write_sheet(workbook, name, rows, note=None):
 
 def add_cagr(workbook):
     for sheet in workbook.worksheets:
-        if sheet.title == METADATA_SHEET:
+        if sheet.title in RESERVED_SHEETS:
             continue
         header = sheet.cell(1, 7, "5Y CAGR (Calculated)")
         header.font = Font(bold=True, color="FFFFFF")
@@ -186,7 +192,7 @@ def previous_rows():
     workbook = load_workbook(XLSX_PATH, read_only=True)
     try:
         for sheet in workbook.worksheets:
-            if sheet.title == METADATA_SHEET:
+            if sheet.title in RESERVED_SHEETS:
                 continue
             saved[sheet.title] = [
                 [label, *[round(value * 100, 4) if isinstance(value, (int, float)) else value for value in values]]
@@ -198,30 +204,59 @@ def previous_rows():
     return saved
 
 
-def previous_status():
+def previous_monthly_rows():
+    if not XLSX_PATH.exists():
+        return {}
+    saved = {}
+    workbook = load_workbook(XLSX_PATH, read_only=True)
+    try:
+        if MONTHLY_SHEET in workbook.sheetnames:
+            for name, label, *values in workbook[MONTHLY_SHEET].iter_rows(min_row=2, max_col=15, values_only=True):
+                if name and (label == "5Yr Avg" or isinstance(label, int)):
+                    saved.setdefault(name, []).append([label, *[round(value * 100, 4) if isinstance(value, (int, float)) else value for value in values]])
+    finally:
+        workbook.close()
+    return saved
+
+
+def previous_status(sheet_name=METADATA_SHEET):
     if not XLSX_PATH.exists():
         return {}
     workbook = load_workbook(XLSX_PATH, read_only=True)
     try:
-        if METADATA_SHEET not in workbook.sheetnames:
+        if sheet_name not in workbook.sheetnames:
             return {}
-        return {name: last_success for name, last_success, *_ in workbook[METADATA_SHEET].iter_rows(min_row=2, max_col=4, values_only=True) if name}
+        return {name: last_success for name, last_success, *_ in workbook[sheet_name].iter_rows(min_row=2, max_col=4, values_only=True) if name}
     finally:
         workbook.close()
 
 
 def main():
+    XLSX_PATH.parent.mkdir(parents=True, exist_ok=True)
     saved = previous_rows()
+    saved_monthly = previous_monthly_rows()
     last_success = previous_status()
+    monthly_success = previous_status(MONTHLY_METADATA_SHEET)
     attempted = date.today().isoformat()
     statuses = []
+    monthly_statuses = []
     workbook = Workbook()
     workbook.remove(workbook.active)
+    monthly_sheet = workbook.create_sheet(MONTHLY_SHEET)
+    monthly_sheet.append(["Index", "Year", *range(1, 13), "Annual Returns"])
+    monthly_sheet.sheet_state = "hidden"
     for name in REQUESTED:
         fetched = False
+        monthly_fetched = False
+        monthly_rows = []
         if name in TRENDLYNE_IDS:
             try:
-                rows = trendlyne_quarterly_returns(TRENDLYNE_IDS[name])
+                periods = trendlyne_returns(TRENDLYNE_IDS[name])
+                rows = periods["quarterly"]
+                monthly_rows = periods["monthly"]
+                if not any(isinstance(row[0], int) and any(isinstance(value, (int, float)) and isfinite(value) for value in row[1:13]) for row in monthly_rows):
+                    monthly_rows = []
+                monthly_fetched = bool(monthly_rows)
                 note = f"Source: Trendlyne quarterly seasonality data, index ID {TRENDLYNE_IDS[name]}; pattern column omitted."
                 if not any(isinstance(row[0], int) for row in rows):
                     rows = []
@@ -239,6 +274,12 @@ def main():
             note = "No reliable public symbol mapping was found; no values were fabricated."
         status = "fresh" if fetched else "cached" if rows else "unavailable"
         statuses.append([name, attempted if fetched else last_success.get(name), attempted, status])
+        if not monthly_fetched:
+            monthly_rows = saved_monthly.get(name, [])
+        monthly_status = "fresh" if monthly_fetched else "cached" if monthly_rows else "unavailable"
+        monthly_statuses.append([name, attempted if monthly_fetched else monthly_success.get(name), attempted, monthly_status])
+        for label, *values in monthly_rows:
+            monthly_sheet.append([name, label, *[value / 100 if isinstance(value, (int, float)) else value for value in values]])
         if name == "Nifty50":
             pd.DataFrame([[name, *row] for row in rows], columns=["Index", "Year", "Q1", "Q2", "Q3", "Q4", "Annual Returns"]).to_csv(CSV_PATH, index=False)
         write_sheet(workbook, name, rows, note)
@@ -247,6 +288,11 @@ def main():
     for record in statuses:
         metadata.append(record)
     metadata.sheet_state = "hidden"
+    monthly_metadata = workbook.create_sheet(MONTHLY_METADATA_SHEET)
+    monthly_metadata.append(["Index", "Last successful refresh", "Last refresh attempt", "Status"])
+    for record in monthly_statuses:
+        monthly_metadata.append(record)
+    monthly_metadata.sheet_state = "hidden"
     add_cagr(workbook)
     workbook.save(XLSX_PATH)
 
