@@ -1,0 +1,18 @@
+IndianIndices
+
+Required Notice: Copyright (c) 2026 the IndianIndices project authors (https://github.com/indianindices/indianindices.github.io).
+
+Original project code, accompanying documentation and original artwork are
+available under the PolyForm Noncommercial License 1.0.0 in LICENSE.
+SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+
+Third-party dependencies and assets retain their respective licenses. The
+financial library is MIT-licensed; simple-statistics is ISC-licensed. Their
+original license notices are preserved in vendor/. The project license does
+not replace or restrict rights granted by those third-party licenses.
+
+Market data and external services remain subject to their source terms.
+This project grants no additional rights to third-party data or trademarks.
+
+For uses outside the purposes permitted by LICENSE, contact the relevant
+rights holders for separate written permission through the official repository.
