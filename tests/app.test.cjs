@@ -6,12 +6,17 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 const source = fs.readFileSync(path.join(root, "app.js"), "utf8").replace(/init\(\);\s*$/, "");
+const researchSource = fs.readFileSync(path.join(root, "research.js"), "utf8");
+const calculatorSource = fs.readFileSync(path.join(root, "calculator.js"), "utf8");
 const realData = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
 
 function setup(data = realData) {
   const elements = new Map();
   let points;
   const context = vm.createContext({
+    UI_CONFIG: structuredClone(require("../ui-config.js")),
+    SectorAnalytics: require("../analytics.js"),
+    InvestmentCalculator: require("../finance-calculations.js"),
     LightweightCharts: { TickMarkType: { Year: 0 }, LineType: { Curved: 2, Simple: 0 }, LineStyle: { Dashed: 2, Solid: 0 } }, Intl, URLSearchParams,
     document: {
       querySelector(selector) {
@@ -25,10 +30,193 @@ function setup(data = realData) {
     chart: { applyOptions() {}, timeScale: () => ({ fitContent() {} }), priceScale: () => ({ applyOptions() {} }) },
     series: { setData(value) { points = value; } },
   });
+  vm.runInContext(researchSource, context);
+  vm.runInContext(calculatorSource, context);
   vm.runInContext(source, context);
   vm.runInContext('state.data = data; state.names = Object.keys(data.assets); state.fromYear = 2000; state.toYear = data.currentYear; state.charts.asset = {chart, series}; state.names.forEach(name => state.stats[name] = computeStats(data.assets[name]));', context);
   return { run: (code) => vm.runInContext(code, context), context, points: () => points };
 }
+
+test("UI config disables Research by default and rejects its deep links", () => {
+  const app = setup();
+  assert.equal(app.run('uiSectionEnabled("research")'), false);
+  app.run('applyUiConfig()');
+  assert.equal(app.run('document.querySelector("#researchBtn").hidden'), true);
+  app.context.location = { hash: "#research/portfolio" };
+  app.context.window = { scrollTo() {} };
+  app.run('renderSidebar = () => {}; renderResearch = () => { throw new Error("Disabled Research rendered"); }; route()');
+  assert.equal(app.context.location.hash, "asset/Nifty50");
+  assert.equal(app.run('document.querySelector("#researchView").hidden'), true);
+});
+
+test("UI config chooses the first enabled tab and hides sections with no enabled children", () => {
+  const app = setup();
+  const buttons = ["heatmap", "returns", "cagr"].map((tab) => ({ dataset: { tab }, attributes: {}, setAttribute(key, value) { this.attributes[key] = value; } }));
+  app.context.document.querySelectorAll = (selector) => selector === "#summaryTabs [role='tab']" ? buttons : [];
+  app.run('UI_CONFIG.subsections.marketOverview.heatmap = false; UI_CONFIG.subsections.marketOverview.returns = false; ensureSummaryChart = () => { throw new Error("Disabled chart created"); }; renderSummary()');
+  assert.equal(app.run('state.summaryTab'), "cagr");
+  assert.equal(buttons[0].hidden, true);
+  assert.equal(buttons[1].hidden, true);
+  assert.equal(buttons[2].hidden, false);
+  assert.equal(app.run('document.querySelector("#summary-cagr-panel").hidden'), false);
+  app.run('UI_CONFIG.subsections.marketOverview.cagr = false; renderSummary(); applyUiConfig()');
+  assert.equal(app.run('uiSectionEnabled("marketOverview")'), false);
+  assert.equal(app.run('document.querySelector("#summaryBtn").hidden'), true);
+  assert.ok(buttons.every((button) => button.hidden));
+  app.run('UI_CONFIG.sections.research = true; UI_CONFIG.subsections.research.quality = false; renderResearch("quality")');
+  assert.equal(app.run('researchState.tab'), "screener");
+  assert.equal(app.run('document.querySelector("#research-quality-panel").hidden'), true);
+});
+
+test("UI config hides asset blocks without initializing a disabled chart", () => {
+  const app = setup();
+  app.run('UI_CONFIG.subsections.assets.chart = false; UI_CONFIG.subsections.assets.stats = false; ensureAssetChart = () => { throw new Error("Disabled asset chart created"); }; renderAsset("Nifty50")');
+  assert.equal(app.run('document.querySelector("#assetChartBlock").hidden'), true);
+  assert.equal(app.run('document.querySelector("#assetStats").hidden'), true);
+  assert.equal(app.run('document.querySelector("#assetTableBlock").hidden'), false);
+  assert.ok(app.run('document.querySelector("#assetTable").innerHTML').includes("Q1"));
+  app.run('UI_CONFIG.subsections.assets.returnsTable = false; renderAsset("Nifty50")');
+  assert.equal(app.run('document.querySelector("#assetRangeControls").hidden'), true);
+  assert.equal(app.run('uiSectionEnabled("assets")'), false);
+});
+
+test("UI config supports disabling every view without a redirect loop", () => {
+  const app = setup();
+  app.context.location = { hash: "#summary" };
+  app.context.window = { scrollTo() {} };
+  app.run('Object.keys(UI_CONFIG.sections).forEach(key => UI_CONFIG.sections[key] = false); renderSidebar = () => {}; route()');
+  assert.equal(app.run('state.view'), null);
+  assert.equal(app.run('document.querySelector("#noViews").hidden'), false);
+  assert.equal(app.context.location.hash, "#summary");
+});
+
+test("UI config normalizes disabled Research tab links and is staged before app.js", () => {
+  const app = setup();
+  app.context.location = { hash: "#research/quality" };
+  app.context.window = { scrollTo() {} };
+  app.run('UI_CONFIG.sections.research = true; UI_CONFIG.subsections.research.quality = false; renderSidebar = () => {}; route()');
+  assert.equal(app.context.location.hash, "research/screener");
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.ok(html.indexOf('src="ui-config.js"') < html.indexOf('src="app.js"'));
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
+    assert.match(fs.readFileSync(path.join(root, file), "utf8"), /cp index.html methodology.html ui-config.js /);
+  }
+});
+
+test("UI config selects the first enabled comparison mode for disabled saved URLs", () => {
+  const app = setup();
+  app.run('UI_CONFIG.subsections.compare.returns = false; state.compareNames = []; state.fromYear = 2020; state.toYear = 2025; state.charts.compare = {chart, lines: []}; applyCompareParams(new URLSearchParams("mode=returns")); renderCompare()');
+  assert.equal(app.run('state.compareMode'), "growth");
+  assert.match(app.run('compareHash()'), /mode=growth/);
+  app.run('Object.keys(UI_CONFIG.subsections.compare).forEach(key => UI_CONFIG.subsections.compare[key] = false); applyUiConfig()');
+  assert.equal(app.run('document.querySelector("#compareBtn").hidden'), true);
+});
+
+test("Calculator config and deep links select enabled modes and hide disabled sections", () => {
+  const app = setup();
+  app.context.location = { hash: "#calculator/swp" };
+  app.context.window = { scrollTo() {} };
+  app.run('let modeRendered; renderCalculator = mode => {modeRendered = mode;}; renderSidebar = () => {}; route()');
+  assert.equal(app.run('state.view'), "calculator");
+  assert.equal(app.run('modeRendered'), "swp");
+  assert.equal(app.run('document.querySelector("#calculatorView").hidden'), false);
+  app.run('UI_CONFIG.subsections.calculator.swp = false; route()');
+  assert.equal(app.context.location.hash, "calculator/sip");
+  app.run('UI_CONFIG.sections.calculator = false; location.hash = "#calculator/swp"; route(); applyUiConfig()');
+  assert.equal(app.run('document.querySelector("#calculatorBtn").hidden'), true);
+  assert.equal(app.run('document.querySelector("#calculatorView").hidden'), true);
+});
+
+test("Calculator exports contain cash-flow assumptions and a projection-specific PNG disclaimer", () => {
+  const app = setup();
+  app.run('calculatorState.result = InvestmentCalculator.project({mode: "swp", amount: 1000, withdrawal: 300, annualReturn: 0, years: 1, start: "2026-10", stepUp: 0})');
+  const records = app.run('calculatorRecords()');
+  assert.equal(records.length, 14);
+  assert.ok(records[0].includes("Requested withdrawal (INR)"));
+  assert.equal(records[5][records[0].indexOf("Actual withdrawal (INR)")], 100);
+  const info = app.run('calculatorExportInfo()');
+  assert.equal(info.title, "SWP projection");
+  assert.match(info.footer, /not a forecast/);
+  assert.ok(!info.footer.includes("Trendlyne"));
+});
+
+test("Research quality and screener render source coverage without creating charts", () => {
+  const app = setup();
+  app.run('UI_CONFIG.sections.research = true');
+  app.run('renderResearch("quality")');
+  assert.equal(app.run('document.querySelector("#research-quality-panel").hidden'), false);
+  assert.equal(app.run('document.querySelector("#researchRangeControls").hidden'), true);
+  assert.ok(app.run('document.querySelector("#qualityTable").innerHTML').includes("Nifty50"));
+  assert.ok(app.run('document.querySelector("#researchBasis").textContent').includes("unverified"));
+  app.run('renderResearch("screener")');
+  assert.equal(app.run('document.querySelector("#research-quality-panel").hidden'), true);
+  assert.equal(app.run('document.querySelector("#research-screener-panel").hidden'), false);
+  assert.ok(app.run('document.querySelector("#screenerTable").innerHTML').includes("Matched windows"));
+  assert.equal(app.run('state.charts.portfolio'), undefined);
+  app.run('document.querySelector("#screenMinWindows").value = 0; renderScreener()');
+  assert.match(app.run('document.querySelector("#screenerStatus").textContent'), /Enter valid/);
+  app.run('document.querySelector("#screenMinWindows").value = 12; document.querySelector("#researchFrom").value = ""; renderScreener()');
+  assert.match(app.run('document.querySelector("#screenerStatus").textContent'), /Enter valid/);
+});
+
+test("Research deep links isolate panels and preserve the existing Market Overview link", () => {
+  const app = setup();
+  app.run('UI_CONFIG.sections.research = true');
+  app.context.location = { hash: "#research/screener" };
+  app.context.window = { scrollTo() {} };
+  app.run('renderSidebar = () => {}; route()');
+  assert.equal(app.run('state.view'), "research");
+  assert.equal(app.run('document.querySelector("#researchView").hidden'), false);
+  assert.equal(app.run('document.querySelector("#assetView").hidden'), true);
+  assert.equal(app.run('document.querySelector("#summaryView").hidden'), true);
+  app.run('location.hash = "#summary"; renderSummary = () => {}; route()');
+  assert.equal(app.run('state.view'), "summary");
+  assert.equal(app.run('document.querySelector("#researchView").hidden'), true);
+});
+
+test("Research exports carry coverage, return basis and reproducible settings", () => {
+  const app = setup();
+  app.run('UI_CONFIG.sections.research = true');
+  app.run('renderResearch("quality")');
+  let rows = app.run('researchRecords("quality")');
+  assert.equal(rows.length, Object.keys(realData.assets).length + 1);
+  assert.equal(rows[0][1], "Return basis");
+  app.run('renderResearch("screener")');
+  rows = app.run('researchRecords("screener")');
+  assert.ok(rows[0].includes("Rolling window (months)"));
+  app.run('researchState.simulation = SectorAnalytics.simulate(state.data, [{name: "Nifty50", weight: 100}], {costBps: 25, rebalance: "annual", from: SectorAnalytics.monthKey("2024-01"), to: SectorAnalytics.monthKey("2026-09")})');
+  rows = app.run('researchRecords("portfolio")');
+  assert.equal(rows[1][rows[0].indexOf("Trading cost (bps)")], 25);
+  assert.equal(rows[1][rows[0].indexOf("Rebalance")], "annual");
+  assert.equal(rows[1][rows[0].indexOf("Target weights (%)")], "Nifty50: 100");
+  assert.equal(rows[1].at(-1), "Return basis unverified");
+});
+
+test("Summary tabs show only their own panel and initialize the chart lazily", () => {
+  const app = setup();
+  const buttons = ["heatmap", "returns", "cagr"].map((tab) => ({ dataset: { tab }, attributes: {}, setAttribute(key, value) { this.attributes[key] = value; } }));
+  app.context.document.querySelectorAll = (selector) => selector === "#summaryTabs [role='tab']" ? buttons : [];
+  app.run('let summaryCalls = 0; ensureSummaryChart = () => { summaryCalls++; return {chart}; }; renderSummary()');
+  assert.equal(app.run('state.summaryTab'), "heatmap");
+  assert.equal(app.run('document.querySelector("#summary-cagr-panel").hidden'), true);
+  assert.equal(app.run('document.querySelector("#summary-heatmap-panel").hidden'), false);
+  assert.equal(app.run('document.querySelector("#summary-returns-panel").hidden'), true);
+  assert.ok(app.run('document.querySelector("#heatmap").innerHTML').includes("<th>Asset</th>"));
+  assert.equal(app.run('summaryCalls'), 0);
+  assert.equal(buttons[0].attributes["aria-selected"], "true");
+  assert.equal(buttons[0].tabIndex, 0);
+  assert.equal(buttons[1].tabIndex, -1);
+  app.run('state.summaryTab = "cagr"; renderSummary()');
+  assert.equal(app.run('document.querySelector("#summary-cagr-panel").hidden'), false);
+  assert.equal(app.run('document.querySelector("#summary-heatmap-panel").hidden'), true);
+  assert.ok(app.run('document.querySelector("#rankings").innerHTML').includes("5Y CAGR"));
+  assert.equal(app.run('summaryCalls'), 0);
+  app.run('state.summaryTab = "returns"; renderSummary()');
+  assert.equal(app.run('document.querySelector("#summary-heatmap-panel").hidden'), true);
+  assert.equal(app.run('document.querySelector("#summary-returns-panel").hidden'), false);
+  assert.equal(app.run('summaryCalls'), 1);
+  assert.equal(buttons[1].attributes["aria-selected"], "true");
+});
 
 test("quarterly and annual chart values match all source indices", () => {
   const app = setup();
@@ -43,6 +231,68 @@ test("quarterly and annual chart values match all source indices", () => {
         .sort((left, right) => left.year - right.year || left.month - right.month);
       assert.deepEqual(Array.from(app.points(), (point) => ({ year: point.time.year, month: point.time.month, value: point.value })), expected);
     }
+  }
+});
+
+test("monthly charts use source values, month ends, labels and year filters", () => {
+  const data = { currentYear: 2028, assets: { A: [{ year: 2028, q: [2, null, null, null], annual: 2 }] },
+    monthlyAssets: { A: [{ year: 2028, m: [1, -2, 0, ...Array(9).fill(null)], annual: 2 }, { year: 2027, m: Array(12).fill(3), annual: 40 }] } };
+  const app = setup(data);
+  app.run('state.asset = "A"; state.returnPeriod = state.tablePeriod = "monthly"; state.fromYear = state.toYear = 2028; renderAsset("A")');
+  assert.deepEqual(Array.from(app.points(), (point) => [point.time.year, point.time.month, point.time.day, point.value]), [[2028, 1, 31, 1], [2028, 2, 29, -2], [2028, 3, 31, 0]]);
+  assert.equal(app.run('assetPeriodLabel({year: 2028, month: 2, day: 29})'), "Feb 2028");
+  assert.ok(app.run('document.querySelector("#assetTable").innerHTML').includes("<th>Dec</th>"));
+  assert.ok(app.run('document.querySelector("#assetTable").innerHTML').includes("2028 YTD"));
+  const records = app.run('state.view = "asset"; exportRecords()');
+  assert.equal(records.length, 2);
+  assert.equal(records[0].length, 16);
+  assert.equal(records[0][3], "Jan (%)");
+  assert.equal(records[1][4], -2);
+  assert.equal(records[1][6], null);
+  assert.ok(app.run('chartExportInfo("asset").title').includes("monthly returns"));
+});
+
+test("monthly mode handles old workbooks and exposes monthly cached status independently", () => {
+  const app = setup({ currentYear: 2026, assets: { A: [{ year: 2025, q: [1, 2, 3, 4], annual: 10 }] },
+    refresh: { A: { status: "fresh", lastSuccess: "2026-10-12" } } });
+  app.run('state.asset = "A"; state.returnPeriod = state.tablePeriod = "monthly"; renderAsset("A")');
+  assert.equal(app.points().length, 0);
+  assert.match(app.run('document.querySelector("#assetChartStatus").textContent'), /No completed returns/);
+  app.run('state.data.monthlyAssets = { A: [{year: 2025, m: [0, ...Array(11).fill(null)], annual: 0}] }; state.data.monthlyRefresh = { A: {status: "cached", lastSuccess: "2025-01-01", lastAttempt: "2026-10-12"} }; renderAsset("A")');
+  assert.equal(app.points()[0].value, 0);
+  assert.match(app.run('document.querySelector("#assetTableStatus").textContent'), /Cached data/);
+  assert.equal(app.run('refreshInfo("A", Date.parse("2026-10-12"), "monthly").kind'), "cached");
+  assert.equal(app.run('refreshInfo("A", Date.parse("2026-10-12")).kind'), "fresh");
+});
+
+test("Summary heatmaps select monthly and quarterly years and preserve missing cells", () => {
+  const app = setup({ currentYear: 2026, assets: {
+    A: [{ year: 2025, q: [1, 2, 3, 4], annual: 10 }], B: [{ year: 2025, q: [null, 0, null, 2], annual: 2 }],
+  }, monthlyAssets: { A: [{ year: 2025, m: [0, -2, ...Array(10).fill(null)], annual: 10 }, { year: 2024, m: Array(12).fill(5), annual: 10 }] } });
+  app.run('state.heatmapPeriod = "monthly"; state.heatmapYear = 2025; renderHeatmap()');
+  let html = app.run('document.querySelector("#heatmap").innerHTML');
+  assert.equal((html.match(/<th>/g) ?? []).length, 14);
+  assert.equal((html.match(/class="empty"/g) ?? []).length, 24);
+  assert.ok(html.includes("-2.00%"));
+  assert.equal(app.run('document.querySelector("#heatmapYearControl").hidden'), false);
+  app.run('state.heatmapYear = 2024; renderHeatmap()');
+  assert.ok(app.run('document.querySelector("#heatmap").innerHTML').includes("+5.00%"));
+  app.run('state.heatmapPeriod = "quarterly"; renderHeatmap()');
+  html = app.run('document.querySelector("#heatmap").innerHTML');
+  assert.equal((html.match(/<th>/g) ?? []).length, 6);
+  assert.ok(html.includes("<th>Q4</th>"));
+  app.run('state.heatmapPeriod = "annual"; renderHeatmap()');
+  assert.equal(app.run('document.querySelector("#heatmapYearControl").hidden'), true);
+});
+
+test("monthly chart values match all refreshed source indices", () => {
+  const app = setup();
+  for (const [name, rows] of Object.entries(realData.monthlyAssets ?? {})) {
+    app.context.name = name;
+    app.run('state.returnPeriod = "monthly"; renderAsset(name)');
+    const expected = rows.filter((row) => !row.avg && row.year >= 2000 && row.year <= realData.currentYear).flatMap((row) => row.m.flatMap((value, index) => value == null ? [] : [{ year: row.year, month: index + 1, value }]))
+      .sort((left, right) => left.year - right.year || left.month - right.month);
+    assert.deepEqual(Array.from(app.points(), (point) => ({ year: point.time.year, month: point.time.month, value: point.value })), expected);
   }
 });
 
@@ -270,6 +520,28 @@ test("public source hints omit refresh failure details and timestamps", () => {
   app.run('delete state.data.refresh');
 });
 
+test("concise README links process and preserves PolyForm and dependency notices", () => {
+  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const method = fs.readFileSync(path.join(root, "docs", "METHOD.md"), "utf8");
+  const license = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
+  assert.ok(readme.split("\n").length < 80);
+  assert.match(readme, /\[docs\/METHOD\.md\]\(docs\/METHOD\.md\)/);
+  assert.ok(!readme.includes("tutorial.gif"));
+  assert.ok(!readme.includes("18-chapter"));
+  for (const heading of ["## Comparison modes", "## Data and year rollover", "## Methodology", "## Local setup"]) assert.ok(method.includes(heading));
+  assert.match(method, /\[ui-config\.js\]\(\.\.\/ui-config\.js\)/);
+  assert.ok(license.startsWith("# PolyForm Noncommercial License 1.0.0\n"));
+  assert.match(license, /Any noncommercial purpose is a permitted purpose/);
+  assert.match(readme, /source-available, not OSI-approved open source/);
+  assert.ok(!readme.includes("all rights reserved"));
+  const notice = fs.readFileSync(path.join(root, "NOTICE"), "utf8");
+  assert.match(notice, /^Required Notice: Copyright/m);
+  assert.match(notice, /does\nnot replace or restrict rights granted by those third-party licenses/);
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) assert.match(fs.readFileSync(path.join(root, file), "utf8"), /data.json LICENSE NOTICE /);
+  assert.match(fs.readFileSync(path.join(root, "vendor", "financial.LICENSE"), "utf8"), /MIT License/);
+  assert.match(fs.readFileSync(path.join(root, "vendor", "simple-statistics.LICENSE"), "utf8"), /ISC License/);
+});
+
 test("dashboard footer links to a deployed standalone methodology page", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const page = fs.readFileSync(path.join(root, "methodology.html"), "utf8");
@@ -277,7 +549,10 @@ test("dashboard footer links to a deployed standalone methodology page", () => {
   assert.ok(html.indexOf('<footer class="data-meta">') > html.indexOf('id="summaryView"'));
   assert.match(html, /<footer class="data-meta">\s*<span id="freshness"><\/span>\s*<a href="methodology.html">Data &amp; methodology<\/a>\s*<\/footer>\s*<\/main>/);
   assert.ok(!html.includes('<details class="methodology">'));
-  assert.equal((page.match(/<dt>/g) || []).length, 9);
+  assert.equal((page.match(/<dt>/g) || []).length, (page.match(/<dd>/g) || []).length);
+  for (const heading of ["Return basis", "Data quality", "Benchmark screener", "Correlations", "Portfolio simulation", "Portfolio risk"]) {
+    assert.ok(page.includes(`<dt>${heading}</dt>`));
+  }
   assert.match(page, /href="index.html">Back to dashboard/);
   for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
     assert.match(fs.readFileSync(path.join(root, file), "utf8"), /cp index.html methodology.html /);
