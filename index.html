@@ -18,7 +18,9 @@
   <aside id="sidebar">
     <div class="brand">Indian<span>Sectors</span></div>
     <button id="compareBtn" class="nav summary">Compare Sectors</button>
-    <button id="summaryBtn" class="nav summary">Summary</button>
+    <button id="summaryBtn" class="nav summary">Market Overview</button>
+    <button id="calculatorBtn" class="nav summary" hidden>Calculator</button>
+    <button id="researchBtn" class="nav summary" hidden>Research</button>
     <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
     <div id="assetList"></div>
     <div class="foot" id="foot"></div>
@@ -133,14 +135,15 @@
     <section id="assetView" hidden>
       <h1 id="assetTitle"></h1>
       <div class="chips" id="assetStats"></div>
-      <div class="range-controls" aria-label="Asset date range">
+      <div id="assetRangeControls" class="range-controls" aria-label="Asset date range">
         <label>From <select class="from-year" aria-label="Asset from year"></select></label>
         <label>To <select class="to-year" aria-label="Asset to year"></select></label>
         <div class="toolbar"><button type="button" class="download-csv">Download CSV</button></div>
       </div>
-      <div class="card">
+      <div id="assetChartBlock" class="card">
         <div class="card-head">
           <div id="returnPeriod" class="period-toggle" role="group" aria-label="Return period">
+            <button type="button" data-period="monthly" aria-pressed="false" aria-controls="assetChart">Monthly returns</button>
             <button type="button" data-period="quarterly" aria-pressed="true" aria-controls="assetChart">Quarterly returns</button>
             <button type="button" data-period="annual" aria-pressed="false" aria-controls="assetChart">Annual returns</button>
           </div>
@@ -159,57 +162,180 @@
         </div>
         <p class="hint">Scroll to zoom &middot; drag to pan &middot; drag the axes to stretch &middot; double-click to fit</p>
         <span class="export-status" data-export-status="asset" role="status"></span>
+        <p id="assetChartStatus" class="hint" role="status"></p>
       </div>
-      <div class="card">
-        <h2>Returns table</h2>
+      <div id="assetTableBlock" class="card">
+        <div class="card-head">
+          <h2>Returns table</h2>
+          <div id="tablePeriod" class="period-toggle" role="group" aria-label="Returns table period">
+            <button type="button" data-period="monthly" aria-pressed="false" aria-controls="assetTable">Monthly</button>
+            <button type="button" data-period="quarterly" aria-pressed="true" aria-controls="assetTable">Quarterly</button>
+          </div>
+        </div>
+        <p id="assetTableStatus" class="hint" role="status"></p>
         <div class="table-wrap"><table id="assetTable" class="grid"></table></div>
       </div>
     </section>
 
     <section id="summaryView" hidden>
-      <h1>Summary</h1>
-      <div class="rankings-section">
-        <h2>Index rankings</h2>
-        <div class="table-wrap"><table id="rankings" class="grid"></table></div>
+      <h1>Market Overview</h1>
+      <div id="summaryTabs" class="period-toggle summary-tabs" role="tablist" aria-label="Market Overview sections">
+        <button type="button" id="summary-heatmap-tab" role="tab" data-tab="heatmap" aria-selected="true" aria-controls="summary-heatmap-panel">Annual heatmap</button>
+        <button type="button" id="summary-returns-tab" role="tab" data-tab="returns" aria-selected="false" aria-controls="summary-returns-panel" tabindex="-1">Annual returns</button>
+        <button type="button" id="summary-cagr-tab" role="tab" data-tab="cagr" aria-selected="false" aria-controls="summary-cagr-panel" tabindex="-1">CAGR</button>
       </div>
-      <div class="card">
-        <div class="card-head">
-          <h2>Annual returns &mdash; all assets</h2>
-          <div class="toolbar" data-chart="summary">
-            <button data-act="png" title="Download chart as PNG" aria-label="Download summary chart as PNG"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button>
-            <button data-act="all">All</button>
-            <button data-act="none">None</button>
-          </div>
+      <section id="summary-cagr-panel" class="summary-panel" role="tabpanel" aria-labelledby="summary-cagr-tab" tabindex="0" hidden>
+        <div class="rankings-section">
+          <h2>Index rankings</h2>
+          <div class="table-wrap"><table id="rankings" class="grid"></table></div>
         </div>
-        <div class="summary-chart">
-          <div class="chart-wrap">
-            <div id="summaryChart" class="chart tall"></div>
-            <div class="toolbar chart-controls" data-chart="summary" role="group" aria-label="Summary chart navigation">
-              <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button>
-              <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button>
-              <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="docs/maximize.svg" width="16" height="16" alt=""></button>
+        <div class="card" id="summaryText"></div>
+      </section>
+      <section id="summary-heatmap-panel" class="summary-panel" role="tabpanel" aria-labelledby="summary-heatmap-tab" tabindex="0">
+        <div class="card">
+          <div class="card-head">
+            <h2 id="heatmapTitle">Annual heatmap</h2>
+            <div id="heatmapPeriod" class="period-toggle" role="group" aria-label="Heatmap period">
+              <button type="button" data-period="monthly" aria-pressed="false" aria-controls="heatmap">Monthly</button>
+              <button type="button" data-period="quarterly" aria-pressed="false" aria-controls="heatmap">Quarterly</button>
+              <button type="button" data-period="annual" aria-pressed="true" aria-controls="heatmap">Annual</button>
             </div>
           </div>
-          <div id="legend" class="legend"></div>
+          <div id="heatmapYearControl" class="range-controls" hidden><label>Year <select id="heatmapYear" aria-label="Heatmap year"></select></label></div>
+          <p id="heatmapStatus" class="hint" role="status"></p>
+          <div class="table-wrap"><table id="heatmap" class="grid heat"></table></div>
         </div>
-        <p class="hint">Hover a legend item to highlight &middot; click to show/hide &middot; scroll to zoom &middot; drag to pan</p>
-        <span class="export-status" data-export-status="summary" role="status"></span>
-      </div>
-      <div class="card" id="summaryText"></div>
-      <div class="card">
-        <h2>Annual heatmap</h2>
-        <div class="table-wrap"><table id="heatmap" class="grid heat"></table></div>
-      </div>
+      </section>
+      <section id="summary-returns-panel" class="summary-panel" role="tabpanel" aria-labelledby="summary-returns-tab" tabindex="0" hidden>
+        <div class="card">
+          <div class="card-head">
+            <h2>Annual returns &mdash; all assets</h2>
+            <div class="toolbar" data-chart="summary">
+              <button data-act="png" title="Download chart as PNG" aria-label="Download Market Overview chart as PNG"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button>
+              <button data-act="all">All</button>
+              <button data-act="none">None</button>
+            </div>
+          </div>
+          <div class="summary-chart">
+            <div class="chart-wrap">
+              <div id="summaryChart" class="chart tall"></div>
+              <div class="toolbar chart-controls" data-chart="summary" role="group" aria-label="Market Overview chart navigation">
+                <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button>
+                <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button>
+                <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="docs/maximize.svg" width="16" height="16" alt=""></button>
+              </div>
+            </div>
+            <div id="legend" class="legend"></div>
+          </div>
+          <p class="hint">Hover a legend item to highlight &middot; click to show/hide &middot; scroll to zoom &middot; drag to pan</p>
+          <span class="export-status" data-export-status="summary" role="status"></span>
+        </div>
+      </section>
     </section>
+    <section id="calculatorView" data-mode="sip" hidden>
+      <h1>Calculator</h1>
+      <div id="calculatorTabs" class="period-toggle summary-tabs" role="tablist" aria-label="Investment calculators">
+        <button type="button" id="calculator-sip-tab" role="tab" data-calculator="sip" aria-selected="true" aria-controls="calculatorPanel">SIP</button>
+        <button type="button" id="calculator-lumpsum-tab" role="tab" data-calculator="lumpsum" aria-selected="false" aria-controls="calculatorPanel" tabindex="-1">LumpSum</button>
+        <button type="button" id="calculator-swp-tab" role="tab" data-calculator="swp" aria-selected="false" aria-controls="calculatorPanel" tabindex="-1">SWP</button>
+      </div>
+      <section id="calculatorPanel" role="tabpanel" aria-labelledby="calculator-sip-tab">
+        <div class="calculator-layout">
+          <form id="calculatorForm" class="calculator-inputs">
+            <label class="calculator-field"><span id="calculatorAmountLabel">Monthly investment (INR)</span><input id="calculatorAmount" type="number" min="1" max="1000000000" step="any" required></label>
+            <label id="calculatorWithdrawalField" class="calculator-field" hidden><span>Monthly withdrawal (INR)</span><input id="calculatorWithdrawal" type="number" min="1" max="1000000000" step="any" required disabled></label>
+            <div class="calculator-field"><label for="calculatorRate">Assumed annual return (%)</label><input id="calculatorRate" type="number" min="-50" max="50" step="any" required><input id="calculatorRateRange" type="range" min="-50" max="50" step="0.25" aria-label="Assumed annual return slider"></div>
+            <div class="calculator-field"><label for="calculatorYears">Duration (years)</label><input id="calculatorYears" type="number" min="1" max="50" step="1" required><input id="calculatorYearsRange" type="range" min="1" max="50" step="1" aria-label="Duration slider"></div>
+            <label id="calculatorStepField" class="calculator-field"><span id="calculatorStepLabel">Annual SIP increase (%)</span><input id="calculatorStepUp" type="number" min="0" max="50" step="any" required></label>
+            <label id="calculatorTimingField" class="calculator-field"><span>Contribution timing</span><select id="calculatorTiming"><option value="begin">Month start</option><option value="end">Month end</option></select></label>
+            <label class="calculator-field"><span>Start month</span><input id="calculatorStart" type="month" min="1900-01" max="2100-12" required></label>
+            <div class="toolbar"><button type="submit">Calculate</button></div>
+          </form>
+          <div class="calculator-results">
+            <div id="calculatorSummary"><div class="calculator-total"><span id="calculatorTotalLabel">Projected value</span><strong id="calculatorTotal"></strong></div><div id="calculatorMetrics" class="calculator-metrics"></div></div>
+            <p id="calculatorStatus" class="hint" role="status" aria-live="polite"></p>
+            <div class="card-head"><div class="calculator-legend"><span><i class="calculator-value-dot"></i><span id="calculatorValueLabel">Investment value</span></span><span><i class="calculator-cash-dot"></i><span id="calculatorCashLabel">Total invested</span></span></div><div class="toolbar"><button type="button" id="calculatorPng"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="calculatorCsv"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+            <div class="chart-wrap"><div id="calculatorChart" class="chart"></div><div id="calculatorTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="calculator" role="group" aria-label="Calculator chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="docs/maximize.svg" width="16" height="16" alt=""></button></div></div>
+            <span id="calculatorExportStatus" class="export-status" role="status"></span>
+            <details class="research-details"><summary>Yearly breakdown</summary><div class="table-wrap"><table id="calculatorYearTable" class="grid research-table"></table></div></details>
+          </div>
+        </div>
+        <p class="hint">Hypothetical constant-return projections, not guaranteed returns. Fees, taxes and inflation excluded. <a href="methodology.html">Calculation assumptions</a></p>
+      </section>
+    </section>
+    <section id="researchView" hidden>
+      <h1>Research</h1>
+      <div id="researchTabs" class="period-toggle summary-tabs" role="tablist" aria-label="Research views">
+        <button type="button" id="research-quality-tab" role="tab" data-research="quality" aria-selected="true" aria-controls="research-quality-panel">Data quality</button>
+        <button type="button" id="research-screener-tab" role="tab" data-research="screener" aria-selected="false" aria-controls="research-screener-panel" tabindex="-1">Benchmark screener</button>
+        <button type="button" id="research-portfolio-tab" role="tab" data-research="portfolio" aria-selected="false" aria-controls="research-portfolio-panel" tabindex="-1">Diversification</button>
+      </div>
+      <p id="researchBasis" class="hint"></p>
+      <div id="researchRangeControls" class="research-controls" hidden>
+        <label>From <input id="researchFrom" type="month" required></label>
+        <label>To <input id="researchTo" type="month" required></label>
+      </div>
+      <section id="research-quality-panel" class="summary-panel" role="tabpanel" aria-labelledby="research-quality-tab" tabindex="0">
+        <div class="card-head"><h2>History &amp; validation</h2><div class="toolbar"><button type="button" class="research-csv" data-export="quality"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+        <p id="qualityStatus" class="hint" role="status"></p>
+        <div class="table-wrap"><table id="qualityTable" class="grid research-table"></table></div>
+        <details id="reconciliationDetails" class="research-details" hidden><summary id="reconciliationCount">Reconciliation exceptions</summary><div class="table-wrap"><table id="reconciliationTable" class="grid research-table"></table></div></details>
+      </section>
+      <section id="research-screener-panel" class="summary-panel" role="tabpanel" aria-labelledby="research-screener-tab" tabindex="0" hidden>
+        <form id="screenerFilters" class="research-controls">
+          <label>Rolling window <select id="screenWindow"><option value="12">12 months</option><option value="36">36 months</option><option value="60">60 months</option></select></label>
+          <label>Min. windows <input id="screenMinWindows" type="number" min="1" max="500" value="12" required></label>
+          <label>Min. win rate (%) <input id="screenMinHit" type="number" min="0" max="100" value="0" required></label>
+          <label>Sort by <select id="screenSort"><option value="hitRate">Win rate</option><option value="latestExcess">Latest excess</option><option value="meanExcess">Average excess</option><option value="maxDrawdown">Smallest drawdown</option></select></label>
+          <label class="research-check"><input id="screenPositive" type="checkbox">Currently beating Nifty50</label>
+          <div class="toolbar"><button type="submit">Apply filters</button><button type="button" id="screenerCsv" class="research-csv" data-export="screener"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div>
+        </form>
+        <p id="screenerStatus" class="hint" role="status"></p>
+        <div class="table-wrap"><table id="screenerTable" class="grid research-table"></table></div>
+        <p class="hint">Overlapping historical windows, not independent forecasts. Drawdown coverage varies by index.</p>
+      </section>
+      <section id="research-portfolio-panel" class="summary-panel" role="tabpanel" aria-labelledby="research-portfolio-tab" tabindex="0" hidden>
+        <form id="portfolioSettings" class="research-controls">
+          <label>Initial investment (INR) <input id="portfolioAmount" type="number" min="1" value="10000" required></label>
+          <label>Rebalance <select id="portfolioRebalance"><option value="none">Buy and hold</option><option value="monthly">Monthly</option><option value="quarterly" selected>Quarterly</option><option value="annual">Annually</option></select></label>
+          <label>Trading cost (bps) <input id="portfolioCosts" type="number" min="0" max="500" step="1" value="10" required></label>
+          <div class="toolbar"><button type="submit">Run simulation</button></div>
+        </form>
+        <div class="research-layout">
+          <fieldset class="allocation-editor"><legend>Portfolio weights</legend><div id="allocationChoices"></div><div class="card-head"><span id="weightTotal" role="status"></span><div class="toolbar"><button type="button" id="equalWeights">Equal weights</button></div></div></fieldset>
+          <div class="portfolio-results">
+            <p id="portfolioStatus" class="hint" role="status"></p>
+            <div class="chips" id="portfolioMetrics"></div>
+            <div class="card-head"><h2>Portfolio value</h2><div class="toolbar"><button type="button" id="portfolioPng"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="portfolioCsv" class="research-csv" data-export="portfolio"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+            <div class="chart-wrap"><div id="portfolioChart" class="chart"></div><div id="portfolioTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="portfolio" role="group" aria-label="Portfolio chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="docs/maximize.svg" width="16" height="16" alt=""></button></div></div>
+            <span id="portfolioExportStatus" class="export-status" role="status"></span>
+            <p id="portfolioBenchmark" class="hint"></p>
+          </div>
+        </div>
+        <div class="card-head"><h2>Monthly correlations</h2><div class="toolbar"><button type="button" id="correlationCsv" class="research-csv" data-export="correlation"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+        <p id="correlationStatus" class="hint" role="status"></p>
+        <div class="table-wrap"><table id="correlationTable" class="grid research-table"></table></div>
+        <p class="hint">Hypothetical index portfolio. No taxes, cash flows or fund tracking differences. Costs apply to purchases and rebalancing; no final liquidation. Nifty50 is buy-and-hold with the same initial purchase cost.</p>
+      </section>
+      <p class="hint">Past performance is not a forecast. <a href="methodology.html">Research methodology</a></p>
+    </section>
+    <section id="noViews" hidden><h1>No views enabled</h1></section>
     <footer class="data-meta">
       <span id="freshness"></span>
       <a href="methodology.html">Data &amp; methodology</a>
     </footer>
   </main>
 
+  <script src="ui-config.js"></script>
   <script src="supabase-config.js"></script>
   <script src="support.js"></script>
   <script src="waitlist.js"></script>
+  <script src="vendor/simple-statistics.min.js"></script>
+  <script src="analytics.js"></script>
+  <script src="research.js"></script>
+  <script src="vendor/financial.min.js"></script>
+  <script src="finance-calculations.js"></script>
+  <script src="calculator.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
