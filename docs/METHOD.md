@@ -48,7 +48,7 @@ past observations, **not a forecast**.
 
 ### UI configuration
 
-Edit [ui-config.js](../ui-config.js) to choose which views appear. Use boolean
+Edit [ui-config.js](../frontend/ui-config.js) to choose which views appear. Use boolean
 `true` / `false` values, then reload the preview or deploy the updated site.
 
 ```js
@@ -69,6 +69,11 @@ The other subsection keys are:
 - `calculator`: `sip`, `lumpsum`, `swp`.
 - `compare`: `returns`, `growth`, `excess`, `rolling3`, `rolling5`, `drawdown`, `recovery`.
 - `assets`: `stats`, `chart`, `returnsTable`.
+
+The `features` object provides independent `calculatorSharing`, `savedScenarios`
+and `watchlists` switches. All default to `true`; setting a feature to `false`
+hides its controls without deleting previously saved browser data. Section and
+subsection switches continue to take precedence for navigation.
 
 A disabled parent hides all its children. A view with every child disabled is
 also hidden. Tabs and keyboard navigation skip disabled children; disabled URLs
@@ -105,6 +110,84 @@ These are hypothetical constant-return projections, not forecasts based on index
 history. Fees, taxes and inflation are excluded. Core future-value calculations
 use the bundled MIT-licensed [financial 0.2.4](https://github.com/lmammino/financial)
 library; no npm installation is needed to run the site.
+
+### Personal Watchlists and Saved Scenarios
+
+Sidebar star buttons pin indices locally. **All indices / Watchlist** switches
+the sidebar scope, and search applies inside either scope. Pinned indices sort
+first; starring an index does not change the current chart. **Saved comparisons**
+on Compare stores up to 10 named combinations of metric, indices and year range.
+Load a saved comparison through its link, or remove it with its remove button.
+
+**Copy scenario link** captures the current calculator's mode, investment,
+effective annual return, duration, start month, contribution timing and applicable
+annual increase/withdrawal. The versioned `#calculator/...` URL fragment restores
+those inputs and the same projection after reload. Invalid or unsupported links
+leave current inputs unchanged and show a status message. If clipboard access
+fails, a read-only selectable link is provided. The link shares the current
+scenario only, not locally saved comparisons. The values are readable to anyone
+with the URL; they are not encrypted. URL fragments are not sent in the initial
+HTTP request, but should not be treated as a place for secrets.
+
+Each calculator mode can save up to three named scenarios. Selected saved rows
+overlay their balance curves on the live graph and appear side-by-side in the
+comparison table. Load restores a scenario; remove deletes it. Comparisons use
+actual scenario calendar dates, so different start dates shift their curves.
+PNG legends/captions include selected scenarios and assumptions. CSV adds their
+monthly balances and settings to the current projection's timeline; values are
+blank outside the saved scenario's available dates.
+
+Watchlists, comparisons and saved scenarios use versioned browser local storage,
+not the waitlist backend. Reload restores valid records; malformed or unknown
+records are ignored. Clearing site storage removes them, and they do not sync
+across devices. If storage is blocked or full, changes remain usable for the
+session and the status explicitly says **this session only**. Anyone sharing the
+same browser profile can access this local data.
+
+### Historical Backtest
+
+The independently enabled **Backtest** view (`sections.backtest`, default `true`;
+`subsections.backtest.historical`) uses completed monthly Trendlyne returns, not
+the Calculator's assumed constant rate. Select SIP or lump sum, exact start/end
+months, investment amount, non-negative index weights totaling 100%, annual SIP
+step-up (0-50%), contribution timing and purchase costs (0-500 bps). Additional
+indices start at zero weight; Equal weights distributes across checked indices.
+The allocation editor is always visible. Equal weights and Nifty50 only sit
+above the index list; Nifty50 only resets allocation to the benchmark.
+The colored bar shows positive weights and the total flags allocations that do
+not sum to 100%. Hovering or keyboard-focusing a segment highlights it and opens
+a floating tooltip with the index name and allocation; Escape dismisses it.
+3Y / 5Y / 10Y / All presets use the available Nifty50 history; selected indices
+must still cover that exact period. Annual SIP increases use a numeric field.
+Result animation respects reduced-motion settings.
+Every positively weighted index and Nifty50 must have each selected month;
+missing or ambiguous history causes an error, never zero-filling or shortening.
+
+Month-start contributions receive that month's return; month-end contributions
+receive returns from the following month. Lump sums always invest at the start.
+Annual SIP increases apply after each 12 contributions. Each deposit purchases
+the target weights after deducting costs; existing holdings drift, without
+rebalancing. The benchmark receives identical cash flows and purchase costs.
+Fractional holdings and immediate execution at monthly boundaries are assumed.
+
+SIP XIRR uses negative dated deposits and a positive terminal value, actual days
+divided by 365, solved by bisection in log-rate space. Month-start cash flows are
+dated the first calendar day; month-end and terminal values use the last calendar
+day. Annualized values over short periods can be extreme; zero-length or
+uncomputable XIRRs stay blank. Lump-sum CAGR uses the same elapsed-day basis and
+requires at least one year. Total-loss terminal values report -100% XIRR when
+elapsed time is positive. Max drawdown uses a unitized, cash-flow-neutral net
+performance series including purchase costs, not the growing cash balance.
+After a total loss its drawdown stays at -100%, even if new money is deposited.
+
+CSV includes monthly transactions and captured settings, allocations, data source,
+export date and return basis. PNG captures the visible chart and assumptions.
+Versioned `#backtest?...` links restore valid settings; invalid or unavailable
+history leaves current inputs unchanged. Sharing exposes the inputs in the URL.
+This is a monthly approximation from rounded returns, not a date-specific trade
+backtest or an investable fund result. Return basis remains unverified; dividends
+are not added. Taxes, inflation, tracking differences and final liquidation are
+excluded. Existing monthly refresh scheduling is unchanged.
 
 ### Research
 
@@ -189,14 +272,14 @@ The workflow fetches returns, exports website data, commits workbook changes
 when returns or refresh metadata change, and deploys GitHub Pages.
 
 Monthly and quarterly histories come from the same source response. Both use the
-existing workbook in `data/sectoraldata.xlsx`: monthly returns are stored in the hidden `_MonthlyReturns`
+existing workbook in `backend/data/sectoraldata.xlsx`: monthly returns are stored in the hidden `_MonthlyReturns`
 sheet, with independent `_MonthlyRefreshStatus` metadata. No second Excel file
 is needed. The workbook provides a saved fallback when the source is unavailable;
 the browser reads only the JSON export. Unfinished months and quarters are blank.
 Run `./dev.sh --refresh` once to populate monthly history in an older workbook.
-Raw Excel and CSV files live in `data/`; the generated `data/sectoraldata.csv`
-remains ignored by Git. The public JSON export stays at the site root, so neither
-raw file is included in the website deployment.
+Raw Excel and CSV files live in `backend/data/`; the generated `backend/data/sectoraldata.csv`
+remains ignored by Git. The public JSON is generated at `frontend/data.json`
+and published at the site root; neither raw file is included in deployment.
 
 ### What happens next year?
 
@@ -230,6 +313,14 @@ The dashboard footer links to the [Data & methodology page](https://indianindice
 
 ## How it works
 
+The repository separates the static browser application in `frontend/` from
+the offline data pipeline and Supabase schema in `backend/`. This is not a
+new API server: backtesting still runs in the browser against the JSON export.
+`frontend/assets/` contains public icons/payment images, `frontend/vendor/`
+contains runtime libraries and licenses, and each side has its own tests.
+Root files are limited to project documentation, licenses and the dev launcher.
+The private root `.env` is read by the configuration generator, never staged.
+
 ```mermaid
 flowchart LR
     A[Trendlyne public returns] --> B[Workbook + per-index refresh metadata]
@@ -240,32 +331,36 @@ flowchart LR
 
 | File | Responsibility |
 |---|---|
-| [build_sectoraldata.py](../build_sectoraldata.py) | Fetches monthly and quarterly returns together, preserves cached data on failure, and writes workbook calculations and independent refresh metadata. |
-| [export_data.py](../export_data.py) | Exports JSON with the current calendar year, hides unfinished months and quarters, and rejects indices without usable quarterly history. |
-| [index.html](../index.html) | Sidebar and asset, comparison, Market Overview and Research views. |
-| [ui-config.js](../ui-config.js) | Top-level view and subsection visibility switches; Research defaults off. |
-| [app.js](../app.js) | Navigation, charts, calculations, rankings, sharing, CSV and PNG exports. |
-| [analytics.js](../analytics.js) | Pure monthly reconciliation, benchmark, correlation and portfolio calculations. |
-| [research.js](../research.js) | Research controls, tables, portfolio chart and exports. |
-| [tests/analytics.test.cjs](../tests/analytics.test.cjs) | Known-result research tests, including gaps, sample limits and fee accounting. |
-| [style.css](../style.css) | Responsive layout and visual theme. |
+| [build_sectoraldata.py](../backend/build_sectoraldata.py) | Fetches monthly and quarterly returns together, preserves cached data on failure, and writes workbook calculations and independent refresh metadata. |
+| [export_data.py](../backend/export_data.py) | Exports JSON with the current calendar year, hides unfinished months and quarters, and rejects indices without usable quarterly history. |
+| [index.html](../frontend/index.html) | Sidebar and asset, comparison, Market Overview and Research views. |
+| [ui-config.js](../frontend/ui-config.js) | Top-level view and subsection visibility switches; Research defaults off. |
+| [app.js](../frontend/app.js) | Navigation, charts, calculations, rankings, sharing, CSV and PNG exports. |
+| [analytics.js](../frontend/analytics.js) | Pure monthly reconciliation, benchmark, correlation and portfolio calculations. |
+| [research.js](../frontend/research.js) | Research controls, tables, portfolio chart and exports. |
+| [backtest.js](../frontend/backtest.js) | Historical backtest controls, allocation tooltips, results and exports. |
+| [generate-config.mjs](../backend/scripts/generate-config.mjs) | Validates public Supabase settings and writes browser-safe configuration. |
+| [setup.sql](../backend/supabase/setup.sql) | Waitlist permissions, write-only RPCs and private signup metrics. |
+| [tests/analytics.test.cjs](../frontend/tests/analytics.test.cjs) | Known-result research tests, including gaps, sample limits and fee accounting. |
+| [style.css](../frontend/style.css) | Responsive layout and visual theme. |
 | [dev.sh](../dev.sh) | Exports local data and serves the dashboard. |
 | [.github/workflows/update-data.yml](../.github/workflows/update-data.yml) | Scheduled refresh and Pages deployment. |
 
 Charts use [TradingView Lightweight Charts](https://github.com/tradingview/lightweight-charts).
 The in-graph and export icons are bundled [Lucide](https://lucide.dev/) assets.
 Research statistics use bundled [simple-statistics 7.8.8](https://github.com/simple-statistics/simple-statistics),
-with its ISC license preserved under [vendor/simple-statistics.LICENSE](../vendor/simple-statistics.LICENSE).
+with its ISC license preserved under [vendor/simple-statistics.LICENSE](../frontend/vendor/simple-statistics.LICENSE).
 
 ## Local setup
 
 Use Python with the project requirements (CI uses Python 3.12) and Node.js 22+
 for public configuration generation and JavaScript tests. No npm install is required.
+Run the following commands from the repository root.
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r backend/requirements.txt
 ./dev.sh
 ```
 
@@ -277,8 +372,8 @@ the workbook; ordinary startup exports the existing workbook without fetching.
 ### Checks
 
 ```bash
-node --test tests/*.test.cjs
-python3 -m unittest discover -s tests -p 'test_*.py'
+node --test frontend/tests/*.test.cjs
+python3 -m unittest discover -s backend/tests -p 'test_*.py'
 git diff --check
 ```
 
@@ -319,10 +414,10 @@ The detailed process in this file is repository documentation, not included in
 the Pages staging allowlist. It is still publicly readable if the repository
 is public. Check GitHub plan and Pages eligibility before making the repo private.
 
-The bundled [financial](../vendor/financial.min.js) and
-[simple-statistics](../vendor/simple-statistics.min.js) scripts are required by
+The bundled [financial](../frontend/vendor/financial.min.js) and
+[simple-statistics](../frontend/vendor/simple-statistics.min.js) scripts are required by
 calculators, Research and their Node tests. Their respective MIT and ISC notices must remain
-with the distributions. [vendor/README.md](../vendor/README.md) explains provenance;
+with the distributions. [vendor/README.md](../frontend/vendor/README.md) explains provenance;
 it is documentation rather than executable code. Charts load Lightweight Charts
 from its pinned CDN URL, and the toolbar uses Lucide assets. Those dependencies
 retain their own rights; the project license does not relicense them or market data.

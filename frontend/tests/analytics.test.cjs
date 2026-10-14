@@ -5,6 +5,52 @@ const analytics = require("../analytics.js");
 const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-8, `${actual} != ${expected}`);
 const fixture = (series) => ({ currentYear: 2030, assets: Object.fromEntries(Object.keys(series).map((name) => [name, []])), monthlyAssets: Object.fromEntries(Object.entries(series).map(([name, values]) => [name, Array.from({ length: Math.ceil(values.length / 12) }, (_, index) => ({ year: 2020 + index, m: values.slice(index * 12, index * 12 + 12) }))])) });
 
+test("historical backtest contribution timing, costs, benchmark parity and cash-flow-neutral losses", () => {
+  const data = fixture({ A: [10, -50], Nifty50: [10, -50] });
+  const weights = [{ name: "A", weight: 100 }];
+  const options = { from: 2020 * 12, to: 2020 * 12 + 1, amount: 100 };
+  const begin = analytics.backtest(data, weights, options);
+  close(begin.finalValue, 105);
+  close(begin.invested, 200);
+  close(begin.maxDrawdown, -50);
+  close(begin.rows.at(-1).benchmark, begin.finalValue);
+  close(begin.xirr, begin.benchmarkXirr);
+  const end = analytics.backtest(data, weights, { ...options, timing: "end", costBps: 100 });
+  close(end.finalValue, 148.5);
+  close(end.costs, 2);
+  assert.ok(end.maxDrawdown < -50);
+  close(analytics.backtest(data, weights, { ...options, mode: "lumpsum", timing: "end" }).finalValue, 55);
+});
+
+test("historical backtest step-ups, annualization, gaps and validation", () => {
+  const data = fixture({ A: Array(24).fill(0), Nifty50: Array(24).fill(0) });
+  const weights = [{ name: "A", weight: 100 }];
+  const options = { from: 2020 * 12, to: 2021 * 12 + 11, amount: 100, stepUp: 10 };
+  const result = analytics.backtest(data, weights, options);
+  close(result.invested, 2520);
+  close(result.rows[12].contribution, 110);
+  close(result.xirr, 0);
+  close(analytics.backtest(data, weights, { ...options, mode: "lumpsum" }).cagr, 0);
+  assert.ok(analytics.backtest(data, weights, { ...options, amount: NaN }).error);
+  assert.ok(analytics.backtest(data, [{ name: "A", weight: 50 }], options).error);
+  data.monthlyAssets.A[0].m[3] = null;
+  assert.match(analytics.backtest(data, weights, options).error, /2020-04/);
+});
+
+test("backtest weighted holdings drift and XIRR matches independently annualized lump-sum growth", () => {
+  const data = fixture({ A: Array(24).fill(1), B: Array(24).fill(0), Nifty50: Array(24).fill(1) });
+  const from = 2020 * 12, to = 2021 * 12 + 11;
+  const result = analytics.backtest(data, [{ name: "A", weight: 50 }, { name: "B", weight: 50 }], { from, to, amount: 100, mode: "lumpsum" });
+  close(result.finalValue, 50 * 1.01 ** 24 + 50);
+  const years = (Date.UTC(2021, 11, 31) - Date.UTC(2020, 0, 1)) / 86400000 / 365;
+  close(result.xirr, ((result.finalValue / 100) ** (1 / years) - 1) * 100);
+  close(result.cagr, result.xirr);
+  const loss = analytics.backtest(fixture({ A: [-100, 0], Nifty50: [-100, 0] }), [{ name: "A", weight: 100 }], { from, to: from + 1, amount: 100 });
+  close(loss.finalValue, 100);
+  close(loss.maxDrawdown, -100);
+  assert.ok(Number.isFinite(loss.xirr));
+});
+
 test("monthly dates and compounding retain zeros and reject missing or unfinished periods", () => {
   const data = fixture({ A: [10, -10, 0, null] });
   const map = analytics.monthlyMap(data, "A");

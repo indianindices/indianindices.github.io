@@ -3,7 +3,7 @@ const QEND = [[3, 31], [6, 30], [9, 30], [12, 31]];
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const $ = (s) => document.querySelector(s);
 const state = { data: null, names: [], stats: {}, view: null, asset: null, charts: {}, cagrYears: 5, returnPeriod: "quarterly", tablePeriod: "quarterly", heatmapPeriod: "annual", heatmapYear: null, summaryTab: "heatmap", compareNames: [], compareMode: "returns", fromYear: null, toYear: null, rankingSort: { key: "cagr5", direction: "desc" } };
-const UI_SUBSECTIONS = { assets: ["stats", "chart", "returnsTable"], compare: ["returns", "growth", "excess", "rolling3", "rolling5", "drawdown", "recovery"], marketOverview: ["heatmap", "returns", "cagr"], calculator: ["sip", "lumpsum", "swp"], research: ["quality", "screener", "portfolio"] };
+const UI_SUBSECTIONS = { assets: ["stats", "chart", "returnsTable"], compare: ["returns", "growth", "excess", "rolling3", "rolling5", "drawdown", "recovery"], marketOverview: ["heatmap", "returns", "cagr"], calculator: ["sip", "lumpsum", "swp"], backtest: ["historical"], research: ["quality", "screener", "portfolio"] };
 
 function enabledUiSubsections(section) {
   if (UI_CONFIG.sections?.[section] === false) return [];
@@ -14,8 +14,12 @@ function uiSectionEnabled(section) {
   return UI_CONFIG.sections?.[section] !== false && enabledUiSubsections(section).length > 0;
 }
 
+function uiFeatureEnabled(feature) {
+  return UI_CONFIG.features?.[feature] !== false;
+}
+
 function applyUiConfig() {
-  const visibility = { "#summaryBtn": "marketOverview", "#calculatorBtn": "calculator", "#compareBtn": "compare", "#researchBtn": "research", "#search": "assets", "#assetList": "assets" };
+  const visibility = { "#summaryBtn": "marketOverview", "#calculatorBtn": "calculator", "#backtestBtn": "backtest", "#compareBtn": "compare", "#researchBtn": "research", "#search": "assets", "#assetList": "assets" };
   Object.entries(visibility).forEach(([selector, section]) => ($(selector).hidden = !uiSectionEnabled(section)));
 }
 
@@ -171,12 +175,6 @@ function refreshInfo(name, now = Date.now(), period = "quarterly") {
   if (!success || record?.status !== "fresh") return { kind: "unknown", label: "Refresh date unknown", detail };
   if ((now - Date.parse(success)) / 86400000 > 45) return { kind: "stale", label: "Refresh over 45 days old", detail };
   return { kind: "fresh", label: `Refreshed ${success}`, detail };
-}
-
-function refreshDot(name, period = "quarterly") {
-  const info = refreshInfo(name, Date.now(), period);
-  const labels = { fresh: "Source data: recently retrieved", cached: "Source data: saved history", stale: "Source data: older history", unavailable: "Source data: unavailable", unknown: "Source data: date not recorded" };
-  return `<span class="refresh-dot ${info.kind}" role="img" aria-label="${labels[info.kind]}" title="${labels[info.kind]}"></span>`;
 }
 
 function renderAsset(name, keepZoom = false) {
@@ -360,6 +358,7 @@ function renderCompare() {
   const modes = enabledUiSubsections("compare");
   if (!modes.includes(state.compareMode)) state.compareMode = modes[0];
   if (!state.compareMode) return;
+  renderSavedComparisons();
   const entry = ensureCompareChart();
   entry.lines.forEach((line) => entry.chart.removeSeries(line.series));
   entry.lines = [];
@@ -739,7 +738,7 @@ function renderHeatmap() {
     const byYear = Object.fromEntries(rows.map((row) => [row.year, row.annual]));
     const selected = rows.find((row) => row.year === state.heatmapYear);
     const values = annual ? years.map((year) => byYear[year] ?? null) : selected?.[monthly ? "m" : "q"] ?? Array(monthly ? 12 : 4).fill(null);
-    return `<tr><td class="label" data-name="${esc(n)}">${esc(n)}${monthly ? refreshDot(n, period) : ""}</td>${cell(state.stats[n].cagr5, 25)}${values.map((value) => cell(value, monthly ? 10 : annual ? 40 : 15)).join("")}</tr>`;
+    return `<tr><td class="label" data-name="${esc(n)}">${esc(n)}</td>${cell(state.stats[n].cagr5, 25)}${values.map((value) => cell(value, monthly ? 10 : annual ? 40 : 15)).join("")}</tr>`;
   }).join("");
   $("#heatmap").innerHTML = head + `<tbody>${body}</tbody>`;
 }
@@ -796,16 +795,27 @@ function renderSummaryText() {
 // ---------- navigation ----------
 function renderSidebar() {
   applyUiConfig();
+  const watching = uiFeatureEnabled("watchlists");
+  $("#assetScope").hidden = !watching || !uiSectionEnabled("assets");
+  $("#watchlistStatus").hidden = !watching || !uiSectionEnabled("assets");
+  $("#watchlistCount").textContent = String(personalState.favorites.size);
+  document.querySelectorAll("#assetScope button").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.scope === (watching ? personalState.scope : "all"))));
   const q = $("#search").value.trim().toLowerCase();
-  $("#assetList").innerHTML = state.names
+  const visibleNames = state.names
     .filter((n) => n.toLowerCase().includes(q))
+    .filter((name) => !watching || personalState.scope !== "watchlist" || personalState.favorites.has(name));
+  if (watching) visibleNames.sort((left, right) => Number(personalState.favorites.has(right)) - Number(personalState.favorites.has(left)));
+  $("#assetList").innerHTML = visibleNames
     .map((n) => {
       const s = shade(state.stats[n].ytd, 30);
       const badge = s ? `<span class="badge" style="background:${s.bg};color:${s.fg}">${fmt(state.stats[n].ytd, 1)}</span>` : "";
-      return `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span><span class="nav-meta">${refreshDot(n)}${badge}</span></button>`;
-    }).join("");
+      const nav = `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span><span class="nav-meta">${badge}</span></button>`;
+      const favorite = personalState.favorites.has(n);
+      return watching ? `<div class="asset-nav-row">${nav}<button type="button" class="watchlist-star" data-watch="${esc(n)}" aria-pressed="${favorite}" aria-label="${favorite ? "Remove" : "Add"} ${esc(n)} ${favorite ? "from" : "to"} watchlist" title="${favorite ? "Remove from" : "Add to"} watchlist"><img src="assets/star.svg" width="16" height="16" alt=""></button></div>` : nav;
+    }).join("") || '<p class="nav-empty">No matching indices</p>';
   $("#summaryBtn").classList.toggle("active", state.view === "summary");
   $("#calculatorBtn").classList.toggle("active", state.view === "calculator");
+  $("#backtestBtn").classList.toggle("active", state.view === "backtest");
   $("#compareBtn").classList.toggle("active", state.view === "compare");
   $("#researchBtn").classList.toggle("active", state.view === "research");
 }
@@ -820,10 +830,10 @@ function route() {
   const name = hash === "support" ? state.asset || state.names[0] : hash.startsWith("asset/") ? hash.slice(6) : null;
   const research = hash === "research" || hash.startsWith("research/");
   const calculator = hash === "calculator" || hash.startsWith("calculator/");
-  const requested = name && state.data.assets[name] ? "assets" : hash === "compare" ? "compare" : calculator ? "calculator" : research ? "research" : hash === "summary" || hash === "support" ? "marketOverview" : null;
-  const available = ["assets", "marketOverview", "calculator", "compare", "research"].filter((section) => uiSectionEnabled(section) && (section !== "assets" || state.names.length));
+  const requested = name && state.data.assets[name] ? "assets" : hash === "backtest" ? "backtest" : hash === "compare" ? "compare" : calculator ? "calculator" : research ? "research" : hash === "summary" || hash === "support" ? "marketOverview" : null;
+  const available = ["assets", "marketOverview", "calculator", "compare", "research", "backtest"].filter((section) => uiSectionEnabled(section) && (section !== "assets" || state.names.length));
   const section = available.includes(requested) ? requested : available[0];
-  ["#assetView", "#summaryView", "#calculatorView", "#compareView", "#researchView"].forEach((selector) => ($(selector).hidden = true));
+  ["#assetView", "#summaryView", "#calculatorView", "#compareView", "#researchView", "#backtestView"].forEach((selector) => ($(selector).hidden = true));
   $("#noViews").hidden = !!section;
   if (!section) {
     state.view = null;
@@ -831,7 +841,7 @@ function route() {
     return;
   }
   if (section !== requested && hash !== "support") {
-    location.hash = section === "assets" ? `asset/${encodeURIComponent(state.names[0])}` : section === "marketOverview" ? "summary" : section === "calculator" ? `calculator/${enabledUiSubsections("calculator")[0]}` : section === "research" ? `research/${enabledUiSubsections("research")[0]}` : "compare";
+    location.hash = section === "assets" ? `asset/${encodeURIComponent(state.names[0])}` : section === "marketOverview" ? "summary" : section === "calculator" ? `calculator/${enabledUiSubsections("calculator")[0]}` : section === "research" ? `research/${enabledUiSubsections("research")[0]}` : section;
     return;
   }
   if (section === "assets") {
@@ -844,13 +854,17 @@ function route() {
     $("#compareView").hidden = false;
     applyCompareParams(params);
     renderCompare();
+  } else if (section === "backtest") {
+    state.view = "backtest";
+    $("#backtestView").hidden = false;
+    renderBacktest(params);
   } else if (section === "calculator") {
     const modes = enabledUiSubsections("calculator");
     const requestedMode = hash.split("/")[1];
     if (requestedMode && !modes.includes(requestedMode)) { location.hash = `calculator/${modes[0]}`; return; }
     state.view = "calculator";
     $("#calculatorView").hidden = false;
-    renderCalculator(requestedMode || modes[0]);
+    renderCalculator(requestedMode || modes[0], params);
   } else if (section === "research") {
     const tabs = enabledUiSubsections("research");
     const requestedTab = hash.split("/")[1];
@@ -1010,7 +1024,7 @@ async function init() {
     select.value = select.classList.contains("from-year") ? state.fromYear : state.toYear;
   });
   state.compareNames = state.names.filter((name, index) => name === "Nifty50" || index === 1);
-  $("#compareChoices").innerHTML = "<legend>Indices</legend>" + state.names.map((name, index) => `<label><input type="checkbox" data-name="${esc(name)}" ${state.compareNames.includes(name) ? "checked" : ""}><span class="dot" style="background:${hsla((index * 137.508) % 360, 80, 62)}"></span><span class="choice-name">${esc(name)}</span>${refreshDot(name)}</label>`).join("");
+  $("#compareChoices").innerHTML = "<legend>Indices</legend>" + state.names.map((name, index) => `<label><input type="checkbox" data-name="${esc(name)}" ${state.compareNames.includes(name) ? "checked" : ""}><span class="dot" style="background:${hsla((index * 137.508) % 360, 80, 62)}"></span><span class="choice-name">${esc(name)}</span></label>`).join("");
   const lastQ = Math.max(...state.names.flatMap((n) => state.data.assets[n].filter((r) => !r.avg).flatMap((r) => r.q.map((v, i) => (v == null ? -1 : r.year * 4 + i)))));
   state.asOf = `Q${(lastQ % 4) + 1} ${Math.floor(lastQ / 4)}`;
   const ageDays = (Date.now() - Date.parse(state.data.generated)) / 86400000;
@@ -1026,8 +1040,12 @@ async function init() {
   $("#foot").textContent = `Data exported ${state.data.generated}`;
   if (uiSectionEnabled("research")) initResearch();
   if (uiSectionEnabled("calculator")) initCalculator();
+  if (uiSectionEnabled("backtest")) initBacktest();
+  loadPersonalization();
+  bindPersonalization();
   bindCalculator();
   bindResearch();
+  bindBacktest();
   bindUI();
   route();
 }

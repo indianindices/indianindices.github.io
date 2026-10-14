@@ -34,28 +34,29 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-      - run: pip install -r requirements.txt
+      - run: pip install -r backend/requirements.txt
 
       - name: Snapshot current data
-        run: python export_data.py && cp data.json /tmp/old.json
+        run: python backend/export_data.py && cp frontend/data.json /tmp/old.json
 
       - name: Fetch latest returns
-        run: python build_sectoraldata.py
+        run: python backend/build_sectoraldata.py
 
       - name: Export JSON for the website
-        run: python export_data.py
+        run: python backend/export_data.py
 
       - name: Test data refresh and export
-        run: python -m unittest discover -s tests -p 'test_*.py'
+        run: python -m unittest discover -s backend/tests -p 'test_*.py'
 
       - name: Commit refreshed workbook if data or refresh status changed
         continue-on-error: true
         run: |
-          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('data.json')); sys.exit(all(o.get(k)==n.get(k) for k in ('assets','refresh','monthlyAssets','monthlyRefresh')))"; then
+          if python -c "import json,sys; o=json.load(open('/tmp/old.json')); n=json.load(open('frontend/data.json')); sys.exit(all(o.get(k)==n.get(k) for k in ('assets','refresh','monthlyAssets','monthlyRefresh')))"; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add data/sectoraldata.xlsx
+            git add backend/data/sectoraldata.xlsx
             git commit -m "Refresh sector data $(date -u +%F)"
             git push
           else
@@ -69,20 +70,22 @@ jobs:
           node-version: "22"
 
       - name: Test dashboard and waitlist
-        run: node --test tests/*.test.cjs
+        run: node --test frontend/tests/*.test.cjs
 
       - name: Generate public Supabase configuration
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-        run: node scripts/generate-config.mjs _site/supabase-config.js
+        run: node backend/scripts/generate-config.mjs _site/supabase-config.js
 
       - name: Stage site files
         run: |
-          mkdir -p _site/docs _site/vendor
-          cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js waitlist.js support.js style.css data.json LICENSE NOTICE _site/
-          cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE _site/vendor/
-          cp docs/github.svg docs/download.svg docs/plus.svg docs/minus.svg docs/maximize.svg docs/x.svg docs/heart.svg docs/globe.svg docs/phonepe_gpay.jpeg docs/paypal.jpeg _site/docs/
+          mkdir -p _site/assets _site/vendor
+          cp LICENSE NOTICE _site/
+          cd frontend
+          cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js backtest.js personalization.js waitlist.js support.js style.css data.json ../_site/
+          cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE ../_site/vendor/
+          cp assets/*.svg assets/lucide.LICENSE assets/phonepe_gpay.jpeg assets/paypal.jpeg ../_site/assets/
 
       - uses: actions/upload-pages-artifact@v3
         with:

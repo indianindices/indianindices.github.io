@@ -7,8 +7,17 @@ from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
-import build_sectoraldata as build
-import export_data as export
+from backend import build_sectoraldata as build
+from backend import export_data as export
+
+
+class RepositoryLayoutTests(unittest.TestCase):
+    def test_pipeline_paths_keep_raw_data_in_backend_and_public_json_in_frontend(self):
+        backend = Path(build.__file__).resolve().parent
+        self.assertEqual(build.XLSX_PATH, backend / "data" / "sectoraldata.xlsx")
+        self.assertEqual(build.CSV_PATH, backend / "data" / "sectoraldata.csv")
+        self.assertEqual(export.XLSX_PATH, build.XLSX_PATH)
+        self.assertEqual(export.OUT_PATH, backend.parent / "frontend" / "data.json")
 
 
 class RefreshTests(unittest.TestCase):

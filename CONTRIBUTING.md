@@ -26,41 +26,44 @@ cd indianindices.github.io
 git switch -c feature/short-description
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install -r backend/requirements.txt
 ./dev.sh
 ```
 
 Open http://localhost:8000. The script exports the existing workbook to
-`data.json` before serving the dashboard. Stop it with Ctrl+C.
-Raw CSV and Excel data are stored in `data/`; the saved workbook is
-`data/sectoraldata.xlsx`. The generated JSON stays at the site root.
+`frontend/data.json` before serving the dashboard. Stop it with Ctrl+C.
+Raw CSV and Excel data are stored in `backend/data/`; the saved workbook is
+`backend/data/sectoraldata.xlsx`. JSON is published at the site root from `frontend/`.
 Use `PORT=9000 ./dev.sh` if port 8000 is occupied. Run `./dev.sh --refresh`
 only when testing source-data changes; it fetches external data and rewrites
 the workbook. Do not include unrelated workbook changes in a pull request.
 
 ## Where to make changes
 
-- [index.html](index.html): page structure and controls.
-- [ui-config.js](ui-config.js): top-level and subsection visibility switches.
-- [style.css](style.css): responsive layout and styling.
-- [app.js](app.js): charts, navigation and return calculations.
-- [analytics.js](analytics.js): pure monthly Research calculations.
-- [research.js](research.js): Research views and exports.
-- [finance-calculations.js](finance-calculations.js): library-backed projection math.
-- [calculator.js](calculator.js): SIP/LumpSum/SWP controls, graphs and exports.
-- [tests/calculator.test.cjs](tests/calculator.test.cjs): timing, compounding and depletion tests.
-- [tests/analytics.test.cjs](tests/analytics.test.cjs): known-result Research regression tests.
-- [build_sectoraldata.py](build_sectoraldata.py): public data fetching and workbook generation.
-- [export_data.py](export_data.py): website data export and unfinished-quarter handling.
-- [tests/app.test.cjs](tests/app.test.cjs): focused JavaScript regression tests.
-- [tests/test_refresh.py](tests/test_refresh.py): isolated refresh metadata and export tests.
+- [index.html](frontend/index.html): page structure and controls.
+- [ui-config.js](frontend/ui-config.js): top-level and subsection visibility switches.
+- [style.css](frontend/style.css): responsive layout and styling.
+- [app.js](frontend/app.js): charts, navigation and return calculations.
+- [analytics.js](frontend/analytics.js): pure monthly Research calculations.
+- [research.js](frontend/research.js): Research views and exports.
+- [finance-calculations.js](frontend/finance-calculations.js): library-backed projection math.
+- [calculator.js](frontend/calculator.js): SIP/LumpSum/SWP controls, graphs and exports.
+- [personalization.js](frontend/personalization.js): local watchlists, saved comparisons and scenarios.
+- [backtest.js](frontend/backtest.js): historical SIP/lump-sum controls, allocations and exports.
+- [tests/calculator.test.cjs](frontend/tests/calculator.test.cjs): timing, compounding and depletion tests.
+- [tests/analytics.test.cjs](frontend/tests/analytics.test.cjs): known-result Research regression tests.
+- [build_sectoraldata.py](backend/build_sectoraldata.py): public data fetching and workbook generation.
+- [export_data.py](backend/export_data.py): website data export and unfinished-quarter handling.
+- [tests/app.test.cjs](frontend/tests/app.test.cjs): focused JavaScript regression tests.
+- [tests/test_refresh.py](backend/tests/test_refresh.py): isolated refresh metadata and export tests.
+- [setup.sql](backend/supabase/setup.sql): Supabase schema and write-only public RPCs.
 - [.github/workflows/update-data.yml](.github/workflows/update-data.yml): refresh and Pages deployment.
 
 ## Checks before a pull request
 
 ```bash
-node --test tests/*.test.cjs
-python3 -m unittest discover -s tests -p 'test_*.py'
+node --test frontend/tests/*.test.cjs
+python3 -m unittest discover -s backend/tests -p 'test_*.py'
 git diff --check
 git status --short
 ```
@@ -86,6 +89,11 @@ Check calculator decimal/zero/negative returns, annual step-ups, contribution
 timing, SWP depletion, invalid fields, sliders, per-mode settings, yearly cash-flow
 tables, CSV/PNG captions and config-disabled calculator links. Preserve the
 financial library's MIT license and public staging entries.
+Check shared scenario URL reload/Back/Forward, malformed parameters, clipboard
+fallback, watchlist filtering/persistence, named comparisons, scenario limits,
+overlay exports, feature flags, and blocked/corrupt browser storage. Saved financial
+inputs must not be sent to the waitlist backend. The star icon is bundled from
+Lucide; preserve [frontend/assets/lucide.LICENSE](frontend/assets/lucide.LICENSE) in public staging.
 
 ## Data and security
 

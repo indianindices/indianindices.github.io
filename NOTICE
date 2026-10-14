@@ -8,7 +8,7 @@ SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 
 Third-party dependencies and assets retain their respective licenses. The
 financial library is MIT-licensed; simple-statistics is ISC-licensed. Their
-original license notices are preserved in vendor/. The project license does
+original license notices are preserved in frontend/vendor/ (vendor/ on the deployed site). The project license does
 not replace or restrict rights granted by those third-party licenses.
 
 Market data and external services remain subject to their source terms.

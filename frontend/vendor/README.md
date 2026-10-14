@@ -1,7 +1,7 @@
 # Bundled statistics
 
 These are third-party runtime dependencies, not original IndianIndices code.
-Their respective licenses remain unchanged by the project's PolyForm Noncommercial [LICENSE](../LICENSE).
+Their respective licenses remain unchanged by the project's PolyForm Noncommercial [LICENSE](../../LICENSE).
 Keep both `.min.js` bundles and both `.LICENSE` notices: the site and Node tests
 load the bundles, and deployment stages the license notices. This README records
 provenance and rebuild instructions; it is not a runtime dependency.

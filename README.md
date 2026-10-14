@@ -22,6 +22,17 @@ Explore sectoral, market-cap and thematic indices without an account or installa
 - Monthly, quarterly and annual returns, heatmaps and CAGR rankings.
 - Sector comparisons, growth, excess returns, drawdown and recovery.
 - SIP, LumpSum and SWP calculators with graphs and CSV/PNG exports.
+- Watchlists, saved comparisons, and shareable calculator scenarios.
+- Historical monthly SIP/lump-sum backtests with weighted indices and Nifty50 comparison.
+
+## Repository Layout
+
+- [frontend/](frontend/): browser code, public assets, bundled libraries and JavaScript tests.
+- [backend/](backend/): data refresh/export scripts, workbook, Supabase schema and Python tests.
+- [docs/](docs/): methodology, README artwork and its generator.
+
+Run `./dev.sh` from the repository root. It exports data, stages public files
+and serves http://localhost:8000 without exposing backend files or `.env`.
 
 ## Documentation
 
@@ -38,7 +49,7 @@ This is source-available, not OSI-approved open source. See [LICENSE](LICENSE)
 and preserve the attribution in [NOTICE](NOTICE).
 
 Third-party dependencies retain their own licenses. The bundled financial and
-statistics libraries and their MIT/ISC notices are documented in [vendor/README.md](vendor/README.md).
+statistics libraries and their MIT/ISC notices are documented in [frontend/vendor/README.md](frontend/vendor/README.md).
 Market data is subject to its source's terms; this project does not grant rights to it.
 
 **Past performance does not predict future returns. This project is not investment advice.**

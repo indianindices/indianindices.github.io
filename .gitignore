@@ -1,6 +1,4 @@
-data.json
-./web/data.json
-web/data.json
+frontend/data.json
 
 # Python
 __pycache__/
@@ -16,6 +14,7 @@ env/
 supabase-config.js
 .preview/
 _site/
+docs/brand.gif
 
 # Jupyter
 .ipynb_checkpoints/

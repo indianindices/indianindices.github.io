@@ -24,7 +24,7 @@ export function publicConfig(env) {
 }
 
 const config = publicConfig(process.env);
-const output = process.argv[2] || "supabase-config.js";
+const output = process.argv[2] || "frontend/supabase-config.js";
 mkdirSync(dirname(output), { recursive: true });
 writeFileSync(output, `window.SUPABASE_CONFIG = ${JSON.stringify(config)};\n`, { mode: 0o644 });
 console.log("Public Supabase configuration generated.");

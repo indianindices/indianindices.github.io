@@ -173,5 +173,73 @@
     return { history, points, benchmark, totalCost, allocations: active.map(({ name, weight }) => ({ name, weight })), settings: { amount, costBps, rebalance }, statistics: risk(points, history.keys.length), benchmarkStatistics: benchmark.length ? risk(benchmark, history.keys.length) : null };
   }
 
-  return { monthKey, monthLabel, monthTime, monthlyMap, compound, commonHistory, audit, screen, correlations, simulate };
+  function moneyWeightedReturn(flows) {
+    const origin = flows[0].day;
+    if (!flows.some((flow) => flow.amount > 0) || !flows.some((flow) => flow.amount < 0)) return null;
+    const value = (logRate) => {
+      const scale = Math.max(0, -logRate * (flows.at(-1).day - origin) / 365);
+      return flows.reduce((sum, flow) => sum + flow.amount * Math.exp(-logRate * (flow.day - origin) / 365 - scale), 0);
+    };
+    let low = -32, high = 32;
+    if (value(low) * value(high) > 0) return null;
+    for (let iteration = 0; iteration < 160; iteration++) {
+      const middle = (low + high) / 2;
+      if (value(middle) > 0) low = middle;
+      else high = middle;
+    }
+    const result = Math.expm1((low + high) / 2) * 100;
+    return Number.isFinite(result) ? result : null;
+  }
+
+  function backtest(data, allocations, options = {}) {
+    const { from, to, mode = "sip", amount = 10000, stepUp = 0, timing = "begin", costBps = 0 } = options;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from > to || to - from > 1200) return { error: "Choose a valid historical start and end month (up to 100 years)." };
+    if (!["sip", "lumpsum"].includes(mode) || !["begin", "end"].includes(timing) || !Number.isFinite(amount) || amount <= 0 || amount > 1e9 || !Number.isFinite(stepUp) || stepUp < 0 || stepUp > 50 || !Number.isFinite(costBps) || costBps < 0 || costBps > 500) return { error: "Enter a positive amount, step-up from 0 to 50%, and purchase costs from 0 to 500 bps." };
+    if (!allocations.length || allocations.some((row) => !data.assets[row.name] || !Number.isFinite(row.weight) || row.weight < 0) || new Set(allocations.map((row) => row.name)).size !== allocations.length || Math.abs(statistics.sum(allocations.map((row) => row.weight)) - 100) > 1e-6) return { error: "Choose unique indices with non-negative weights totaling 100%." };
+    const active = allocations.filter((row) => row.weight > 0);
+    const maps = active.map((row) => monthlyMap(data, row.name));
+    const benchmarkMap = monthlyMap(data, "Nifty50");
+    const keys = Array.from({ length: to - from + 1 }, (_, index) => from + index);
+    for (const key of keys) {
+      const missing = active.filter((row, index) => !maps[index].has(key)).map((row) => row.name);
+      if (!benchmarkMap.has(key)) missing.push("Nifty50 benchmark");
+      if (missing.length) return { error: `Missing completed monthly history for ${missing.join(", ")} in ${monthLabel(key)}. Choose a continuous available period.` };
+    }
+    const day = (key, begin = false) => {
+      const time = monthTime(key);
+      return Date.UTC(time.year, time.month - 1, begin ? 1 : time.day) / 86400000;
+    };
+    let holdings = active.map(() => 0), benchmark = 0, invested = 0, costs = 0, units = 0, nav = 1;
+    const flows = [], benchmarkFlows = [], rows = [], performance = [{ key: from - 1, value: 1 }];
+    keys.forEach((key, index) => {
+      const contribution = mode === "lumpsum" ? index === 0 ? amount : 0 : amount * (1 + stepUp / 100) ** Math.floor(index / 12);
+      const fee = contribution * costBps / 10000;
+      const opening = statistics.sum(holdings);
+      const purchase = () => {
+        if (nav > 0) units += contribution / nav;
+        holdings = holdings.map((value, position) => value + (contribution - fee) * active[position].weight / 100);
+        benchmark += contribution - fee;
+        invested += contribution;
+        costs += fee;
+        const date = day(key, timing === "begin" || mode === "lumpsum");
+        if (contribution) { flows.push({ day: date, amount: -contribution }); benchmarkFlows.push({ day: date, amount: -contribution }); }
+      };
+      if (timing === "begin" || mode === "lumpsum") purchase();
+      holdings = holdings.map((value, position) => value * (1 + maps[position].get(key) / 100));
+      benchmark *= 1 + benchmarkMap.get(key) / 100;
+      if (units && nav > 0) nav = statistics.sum(holdings) / units;
+      if (timing === "end" && mode === "sip") {
+        purchase();
+        if (units && nav > 0) nav = statistics.sum(holdings) / units;
+      }
+      performance.push({ key, value: nav });
+      rows.push({ key, opening, contribution, fee, invested, value: statistics.sum(holdings), benchmark });
+    });
+    const last = rows.at(-1), endDay = day(to);
+    const finalFlows = [...flows, { day: endDay, amount: last.value }];
+    const firstDay = flows[0].day, years = (endDay - firstDay) / 365;
+    return { settings: { from, to, mode, amount, stepUp, timing, costBps }, allocations: active.map((row) => ({ ...row })), rows, invested, costs, finalValue: last.value, gain: last.value - invested, xirr: endDay > firstDay ? last.value === 0 ? -100 : moneyWeightedReturn(finalFlows) : null, cagr: mode === "lumpsum" && years >= 1 ? ((last.value / amount) ** (1 / years) - 1) * 100 : null, maxDrawdown: risk(performance, keys.length).maxDrawdown, benchmarkXirr: endDay > firstDay ? last.benchmark === 0 ? -100 : moneyWeightedReturn([...benchmarkFlows, { day: endDay, amount: last.benchmark }]) : null };
+  }
+
+  return { monthKey, monthLabel, monthTime, monthlyMap, compound, commonHistory, audit, screen, correlations, simulate, backtest };
 });

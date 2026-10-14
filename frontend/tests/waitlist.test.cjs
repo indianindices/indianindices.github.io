@@ -7,6 +7,7 @@ const os = require("node:os");
 const { spawnSync } = require("node:child_process");
 
 const root = path.join(__dirname, "..");
+const repoRoot = path.join(root, "..");
 const source = fs.readFileSync(path.join(root, "waitlist.js"), "utf8");
 const visitorId = "10000000-0000-4000-8000-000000000001";
 
@@ -182,15 +183,15 @@ test("support backdrop closes the dialog without closing on content clicks", () 
 test("support markup contains payment links, QR assets, and correct header order", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   assert.ok(html.indexOf('id="openSupport"') < html.indexOf('id="openWaitlist"'));
-  assert.ok(html.includes('src="docs/heart.svg"'));
+  assert.ok(html.includes('src="assets/heart.svg"'));
   assert.ok(html.includes('href="upi://pay?pa=kavincsbi%40ybl"'));
   assert.ok(html.includes('href="https://www.paypal.me/kavinchandra"'));
   assert.ok(html.includes("Google Pay &bull; PhonePe &bull; Paytm"));
-  for (const file of ["docs/phonepe_gpay.jpeg", "docs/paypal.jpeg"]) {
+  for (const file of ["assets/phonepe_gpay.jpeg", "assets/paypal.jpeg"]) {
     assert.ok(html.includes(`src="${file}"`));
     assert.ok(fs.existsSync(path.join(root, file)));
     for (const staging of ["dev.sh", ".github/workflows/update-data.yml"]) {
-      assert.ok(fs.readFileSync(path.join(root, staging), "utf8").includes(file));
+      assert.ok(fs.readFileSync(path.join(repoRoot, staging), "utf8").includes(file));
     }
   }
 });
@@ -253,7 +254,7 @@ test("invalid input and in-flight double submits do not create requests", async 
 test("config generation accepts only browser-safe keys and handles missing config", () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "waitlist-config-"));
   const output = path.join(directory, "supabase-config.js");
-  const generate = (url, key) => spawnSync(process.execPath, [path.join(root, "scripts/generate-config.mjs"), output], {
+  const generate = (url, key) => spawnSync(process.execPath, [path.join(repoRoot, "backend/scripts/generate-config.mjs"), output], {
     cwd: directory,
     env: { ...process.env, SUPABASE_URL: url, SUPABASE_PUBLISHABLE_KEY: key },
     encoding: "utf8",

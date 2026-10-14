@@ -1,9 +1,15 @@
 const UI_CONFIG = {
+  features: {
+    calculatorSharing: true,
+    savedScenarios: true,
+    watchlists: true,
+  },
   sections: {
     assets: true,
     compare: true,
     marketOverview: true,
     calculator: true,
+    backtest: true,
     research: false,
   },
   subsections: {
@@ -36,6 +42,7 @@ const UI_CONFIG = {
       screener: true,
       portfolio: true,
     },
+    backtest: { historical: true },
   },
 };
 

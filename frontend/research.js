@@ -40,7 +40,7 @@ function initResearch() {
   selected.forEach((name, index) => (researchState.weights[name] = index === selected.length - 1 ? 100 - (selected.length - 1) * Math.floor(100 / selected.length) : Math.floor(100 / selected.length)));
   $("#allocationChoices").innerHTML = state.names.map((name) => {
     const active = Object.hasOwn(researchState.weights, name);
-    return `<div class="allocation-row"><label><input type="checkbox" data-index="${esc(name)}" ${active ? "checked" : ""}><span>${esc(name)}</span>${refreshDot(name, "monthly")}</label><label class="weight-field"><input type="number" data-weight="${esc(name)}" aria-label="${esc(name)} weight percent" min="0" max="100" step="0.01" value="${researchState.weights[name] ?? 0}" ${active ? "" : "disabled"}><span>%</span></label></div>`;
+    return `<div class="allocation-row"><label><input type="checkbox" data-index="${esc(name)}" ${active ? "checked" : ""}><span>${esc(name)}</span></label><label class="weight-field"><input type="number" data-weight="${esc(name)}" aria-label="${esc(name)} weight percent" min="0" max="100" step="0.01" value="${researchState.weights[name] ?? 0}" ${active ? "" : "disabled"}><span>%</span></label></div>`;
   }).join("");
 }
 
@@ -100,7 +100,7 @@ function renderScreener() {
     });
     $("#screenerStatus").textContent = `${researchState.screen.length} eligible indices · Nifty50 benchmark · ${window}-month rolling returns · at least ${minimum} matched windows`;
   }
-  const rows = researchState.screen.map((row) => `<tr><td class="label"><a href="#asset/${encodeURIComponent(row.name)}">${esc(row.name)}</a>${refreshDot(row.name, "monthly")}</td><td>${row.hitRate.toFixed(1)}%</td><td>${row.windows}</td><td class="${cls(row.latestExcess)}">${fmtPp(row.latestExcess)}</td><td class="${cls(row.meanExcess)}">${fmtPp(row.meanExcess)}</td><td>${row.last == null ? "—" : SectorAnalytics.monthLabel(row.last)}</td><td class="neg" title="${row.riskStart == null ? "No shared history" : `${SectorAnalytics.monthLabel(row.riskStart)} to ${SectorAnalytics.monthLabel(row.riskEnd)}`}">${fmt(row.maxDrawdown)}</td><td>${row.riskMonths}</td></tr>`);
+  const rows = researchState.screen.map((row) => `<tr><td class="label"><a href="#asset/${encodeURIComponent(row.name)}">${esc(row.name)}</a></td><td>${row.hitRate.toFixed(1)}%</td><td>${row.windows}</td><td class="${cls(row.latestExcess)}">${fmtPp(row.latestExcess)}</td><td class="${cls(row.meanExcess)}">${fmtPp(row.meanExcess)}</td><td>${row.last == null ? "—" : SectorAnalytics.monthLabel(row.last)}</td><td class="neg" title="${row.riskStart == null ? "No shared history" : `${SectorAnalytics.monthLabel(row.riskStart)} to ${SectorAnalytics.monthLabel(row.riskEnd)}`}">${fmt(row.maxDrawdown)}</td><td>${row.riskMonths}</td></tr>`);
   $("#screenerTable").innerHTML = researchTable(["Index", "Beat Nifty50", "Matched windows", "Latest excess (pp)", "Average excess (pp)", "Last matched end", "Month-end max DD", "Risk months"], rows);
   $("#screenerCsv").disabled = !rows.length;
 }

@@ -9,7 +9,7 @@ from openpyxl import load_workbook
 
 ROOT = Path(__file__).parent
 XLSX_PATH = ROOT / "data" / "sectoraldata.xlsx"
-OUT_PATH = ROOT / "data.json"
+OUT_PATH = ROOT.parent / "frontend" / "data.json"
 QUARTER_ENDS = [(3, 31), (6, 30), (9, 30), (12, 31)]
 METADATA_SHEET = "_RefreshStatus"
 MONTHLY_SHEET = "_MonthlyReturns"

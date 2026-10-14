@@ -5,9 +5,12 @@ const path = require("node:path");
 const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
+const repoRoot = path.join(root, "..");
 const source = fs.readFileSync(path.join(root, "app.js"), "utf8").replace(/init\(\);\s*$/, "");
 const researchSource = fs.readFileSync(path.join(root, "research.js"), "utf8");
 const calculatorSource = fs.readFileSync(path.join(root, "calculator.js"), "utf8");
+const personalSource = fs.readFileSync(path.join(root, "personalization.js"), "utf8");
+const backtestSource = fs.readFileSync(path.join(root, "backtest.js"), "utf8");
 const realData = JSON.parse(fs.readFileSync(path.join(root, "data.json"), "utf8"));
 
 function setup(data = realData) {
@@ -17,10 +20,10 @@ function setup(data = realData) {
     UI_CONFIG: structuredClone(require("../ui-config.js")),
     SectorAnalytics: require("../analytics.js"),
     InvestmentCalculator: require("../finance-calculations.js"),
-    LightweightCharts: { TickMarkType: { Year: 0 }, LineType: { Curved: 2, Simple: 0 }, LineStyle: { Dashed: 2, Solid: 0 } }, Intl, URLSearchParams,
+    LightweightCharts: { TickMarkType: { Year: 0 }, LineType: { Curved: 2, Simple: 0 }, LineStyle: { Dashed: 2, Solid: 0 } }, Intl, URLSearchParams, URL,
     document: {
       querySelector(selector) {
-        if (!elements.has(selector)) elements.set(selector, { hidden: false, textContent: "", innerHTML: "" });
+        if (!elements.has(selector)) elements.set(selector, { hidden: false, textContent: "", innerHTML: "", dataset: {}, classList: { toggle() {} }, setAttribute() {}, focus() {}, select() {} });
         return elements.get(selector);
       },
       querySelectorAll: () => [],
@@ -32,10 +35,73 @@ function setup(data = realData) {
   });
   vm.runInContext(researchSource, context);
   vm.runInContext(calculatorSource, context);
+  vm.runInContext(personalSource, context);
+  vm.runInContext(backtestSource, context);
   vm.runInContext(source, context);
   vm.runInContext('state.data = data; state.names = Object.keys(data.assets); state.fromYear = 2000; state.toYear = data.currentYear; state.charts.asset = {chart, series}; state.names.forEach(name => state.stats[name] = computeStats(data.assets[name]));', context);
   return { run: (code) => vm.runInContext(code, context), context, points: () => points };
 }
+
+test("Backtest links round-trip captured settings, exports ignore pending edits and disabled routes fall back", () => {
+  const app = setup();
+  app.run('document.querySelector("#backtestMode").value = "sip"; document.querySelector("#backtestAmount").value = "10000"; document.querySelector("#backtestStepUp").value = "10"; document.querySelector("#backtestTiming").value = "begin"; document.querySelector("#backtestCosts").value = "5"; initBacktest(); ensureBacktestChart = () => ({chart,portfolio:series,benchmark:series,invested:series}); renderBacktest()');
+  assert.equal(app.run('!!backtestState.result.error'), false);
+  const hash = app.run('backtestHash()');
+  app.run('document.querySelector("#backtestAmount").value = "999"');
+  assert.equal(JSON.parse(app.run('backtestRecords()[1][7]')).amount, 10000);
+  app.context.sharedParams = new URLSearchParams(hash.split("?")[1]);
+  app.run('renderBacktest(sharedParams)');
+  assert.equal(app.run('backtestState.result.settings.amount'), 10000);
+  assert.equal(app.run('backtestState.result.settings.stepUp'), 10);
+  assert.equal(app.run('applyBacktestParams(new URLSearchParams("v=9"))'), "Invalid backtest link; current inputs were kept.");
+  assert.equal(app.run('backtestState.result.settings.amount'), 10000);
+  app.context.location = { hash: "#backtest" };
+  app.context.window = { scrollTo() {} };
+  app.run('renderSidebar = () => {}; route()');
+  assert.equal(app.run('state.view'), "backtest");
+  app.run('UI_CONFIG.sections.backtest = false; route()');
+  assert.equal(app.context.location.hash, "asset/Nifty50");
+  assert.equal(app.run('document.querySelector("#backtestView").hidden'), true);
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) assert.ok(fs.readFileSync(path.join(repoRoot, file), "utf8").includes("backtest.js"));
+});
+
+test("Backtest allocation stays visible, segments expose labels and totals expose validity", () => {
+  const app = setup();
+  app.run('document.querySelector("#backtestMode").value = "sip"; document.querySelector("#backtestAmount").value = "10000"; document.querySelector("#backtestStepUp").value = "10"; document.querySelector("#backtestTiming").value = "begin"; document.querySelector("#backtestCosts").value = "0"; initBacktest(); ensureBacktestChart = () => ({chart,portfolio:series,benchmark:series,invested:series}); renderBacktest()');
+  assert.equal(app.run('document.querySelector("#backtestWeightTotal").dataset.valid'), "true");
+  assert.match(app.run('document.querySelector("#backtestAllocationBar").innerHTML'), /Nifty50: 100\.00%/);
+  assert.match(app.run('document.querySelector("#backtestMetrics").innerHTML'), /backtest-metric/);
+  app.run('globalThis.allocationWrites = 0; let allocationHtml = document.querySelector("#backtestAllocationBar").innerHTML; Object.defineProperty(document.querySelector("#backtestAllocationBar"), "innerHTML", { get() { return allocationHtml; }, set(value) { allocationHtml = value; allocationWrites++; } }); document.querySelector("#backtestAmount").value = "12000"; renderBacktest()');
+  assert.equal(app.run('allocationWrites'), 0);
+  const weights = app.run('document.querySelector("#backtestWeights").innerHTML');
+  assert.ok(weights.includes('data-backtest-index="IT"'));
+  assert.ok(weights.includes('data-backtest-index="Nifty50"'));
+  assert.match(app.run('document.querySelector("#backtestAllocationBar").innerHTML'), /tabindex="0"/);
+  assert.match(app.run('document.querySelector("#backtestAllocationBar").innerHTML'), /data-allocation-label="Nifty50: 100\.00%"/);
+  assert.equal(app.run('backtestState.weights.Nifty50'), 100);
+  app.run('backtestState.weights.IT = 20; renderBacktest()');
+  assert.equal(app.run('allocationWrites'), 1);
+  assert.equal(app.run('document.querySelector("#backtestWeightTotal").dataset.valid'), "false");
+  assert.equal(app.run('document.querySelector("#backtestStatus").dataset.error'), "true");
+  app.run('backtestState.weights = {Nifty50: 100 / 3, IT: 200 / 3}; renderBacktest()');
+  const segments = app.run('document.querySelector("#backtestAllocationBar").innerHTML');
+  assert.match(segments, /data-allocation-label="Nifty50: 33\.33%"/);
+  assert.match(segments, /aria-label="IT: 66\.67%"/);
+  assert.equal(app.run('backtestState.weights.Nifty50'), 100 / 3);
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.ok(html.includes('<section id="backtestAllocation"'));
+  assert.ok(!html.includes('<details class="research-details" id="backtestAllocation"'));
+  assert.ok(!html.includes('id="backtestStepSlider"'));
+  assert.ok(!html.includes('id="backtestSearch"'));
+  assert.ok(html.includes('id="backtestAllocationTip" role="tooltip"'));
+});
+
+test("watchlist icon has an explicit stroke and a fixed unpadded visible button", () => {
+  const icon = fs.readFileSync(path.join(root, "assets/star.svg"), "utf8");
+  const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
+  assert.ok(icon.includes('stroke="#000000"'));
+  assert.match(css, /\.watchlist-star, \.icon-command \{[^}]*padding: 0;/);
+});
 
 test("UI config disables Research by default and rejects its deep links", () => {
   const app = setup();
@@ -99,7 +165,7 @@ test("UI config normalizes disabled Research tab links and is staged before app.
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   assert.ok(html.indexOf('src="ui-config.js"') < html.indexOf('src="app.js"'));
   for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
-    assert.match(fs.readFileSync(path.join(root, file), "utf8"), /cp index.html methodology.html ui-config.js /);
+    assert.match(fs.readFileSync(path.join(repoRoot, file), "utf8"), /cp index.html methodology.html ui-config.js /);
   }
 });
 
@@ -110,6 +176,110 @@ test("UI config selects the first enabled comparison mode for disabled saved URL
   assert.match(app.run('compareHash()'), /mode=growth/);
   app.run('Object.keys(UI_CONFIG.subsections.compare).forEach(key => UI_CONFIG.subsections.compare[key] = false); applyUiConfig()');
   assert.equal(app.run('document.querySelector("#compareBtn").hidden'), true);
+});
+
+test("Watchlists persist valid indices and render escaped, filtered sidebar entries", () => {
+  const app = setup();
+  const storage = new Map();
+  app.context.localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
+  app.run('document.querySelector("#search").value = ""; loadPersonalization(); toggleWatchlist("IT"); toggleWatchlist("Nifty50"); personalState.scope = "watchlist"; renderSidebar()');
+  let html = app.run('document.querySelector("#assetList").innerHTML');
+  assert.ok(html.includes('data-name="IT"'));
+  assert.ok(html.includes('data-name="Nifty50"'));
+  assert.ok(!html.includes('data-name="FMCG"'));
+  app.run('loadPersonalization()');
+  assert.equal(app.run('personalState.favorites.size'), 2);
+  app.run('toggleWatchlist("IT")');
+  assert.equal(app.run('personalState.favorites.has("IT")'), false);
+  app.run('UI_CONFIG.features.watchlists = false; renderSidebar()');
+  assert.equal(app.run('document.querySelector("#assetScope").hidden'), true);
+  html = app.run('document.querySelector("#assetList").innerHTML');
+  assert.ok(!html.includes("watchlist-star"));
+  assert.ok(html.includes('data-name="FMCG"'));
+});
+
+test("Malformed local data is ignored and blocked storage keeps watchlists usable for the session", () => {
+  const app = setup();
+  app.context.localStorage = { getItem: () => '{"version":1,"favorites":["IT","unknown"],"comparisons":[{"id":"bad","name":"Bad","hash":"javascript:alert(1)"}],"scenarios":[{"id":"invalid","name":"Bad","settings":{"mode":"sip"}}]}', setItem: () => { throw new Error("blocked"); } };
+  app.run('document.querySelector("#search").value = ""; loadPersonalization()');
+  assert.equal(app.run('personalState.favorites.size'), 1);
+  assert.equal(app.run('personalState.comparisons.length'), 0);
+  assert.equal(app.run('personalState.scenarios.length'), 0);
+  app.run('toggleWatchlist("Nifty50")');
+  assert.equal(app.run('personalState.favorites.has("Nifty50")'), true);
+  assert.match(app.run('document.querySelector("#watchlistStatus").textContent'), /this session only/);
+  app.context.localStorage.getItem = () => { throw new Error("denied"); };
+  assert.doesNotThrow(() => app.run('loadPersonalization()'));
+  assert.equal(app.run('personalState.persistent'), false);
+});
+
+test("Named comparisons retain metric, indices and years without unsafe links or HTML", () => {
+  const app = setup();
+  const storage = new Map();
+  app.context.localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
+  app.run('state.compareNames = ["Nifty50","IT"]; state.compareMode = "excess"; state.fromYear = 2020; state.toYear = 2025; document.querySelector("#comparisonName").value = "<img src=x>"; saveCurrentComparison()');
+  assert.equal(app.run('personalState.comparisons.length'), 1);
+  assert.match(app.run('personalState.comparisons[0].hash'), /mode=excess/);
+  assert.match(app.run('personalState.comparisons[0].hash'), /asset=IT/);
+  assert.ok(!app.run('document.querySelector("#savedComparisonList").innerHTML').includes('<img src=x>'));
+  app.run('loadPersonalization()');
+  assert.equal(app.run('personalState.comparisons.length'), 1);
+  assert.equal(app.run('validSavedComparison("javascript:alert(1)")'), false);
+  assert.equal(app.run('validSavedComparison("compare?mode=excess&from=2020&to=2025&asset=unknown")'), false);
+});
+
+test("Saved scenarios retain canonical assumptions, enforce limits and enrich comparison exports", () => {
+  const app = setup();
+  const storage = new Map();
+  app.context.localStorage = { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) };
+  app.run('updateCalculator = () => {}; calculatorState.mode = "sip"; calculatorState.result = InvestmentCalculator.project({mode:"sip",amount:1000,annualReturn:0,years:1,start:"2026-10",stepUp:0,timing:"begin"}); document.querySelector("#calculatorScenarioName").value = "Base"; saveCalculatorScenario(); saveCalculatorScenario(); saveCalculatorScenario(); saveCalculatorScenario()');
+  assert.equal(app.run('personalState.scenarios.length'), 3);
+  assert.match(app.run('document.querySelector("#savedScenarioStatus").textContent'), /Maximum 3/);
+  app.run('loadPersonalization()');
+  assert.equal(app.run('personalState.scenarios.length'), 3);
+  assert.equal(app.run('activeCalculatorScenarios().length'), 3);
+  const records = app.run('calculatorRecords()');
+  assert.ok(records[0].includes("Base value (INR)"));
+  assert.equal(records.at(-1)[records[0].indexOf("Base value (INR)")], 12000);
+  app.run('personalState.scenarios[0].visible = false');
+  assert.equal(app.run('activeCalculatorScenarios().length'), 2);
+  app.run('UI_CONFIG.features.savedScenarios = false; renderSavedScenarios()');
+  assert.equal(app.run('activeCalculatorScenarios().length'), 0);
+  assert.equal(app.run('document.querySelector("#savedScenarioSection").hidden'), true);
+});
+
+test("Calculator scenario links round-trip every mode and reject malformed assumptions", () => {
+  const app = setup();
+  for (const mode of ["sip", "lumpsum", "swp"]) {
+    app.context.settings = { mode, amount: 12345.67, annualReturn: -2.5, years: 12, start: "2028-02", stepUp: 3.5, withdrawal: 1000, timing: "end" };
+    const hash = app.run('calculatorScenarioHash(settings)');
+    app.context.params = new URLSearchParams(hash.split("?")[1]);
+    const decoded = app.run('calculatorScenarioFromParams(settings.mode, params)');
+    assert.ok(!decoded.error);
+    app.context.decoded = decoded.settings;
+    assert.equal(app.run('InvestmentCalculator.project(decoded).balance'), app.run('InvestmentCalculator.project(settings).balance'));
+    app.context.params.set("years", "1.5");
+    assert.ok(app.run('calculatorScenarioFromParams(settings.mode, params).error'));
+  }
+  for (const query of ["v=2", "v=1&amount=10&amount=20", "v=1&amount=Infinity", "v=1&amount=0", "v=1&amount=100&annualReturn=12&years=2&start=2026-13&stepUp=0&timing=begin"]) {
+    app.context.params = new URLSearchParams(query);
+    assert.ok(app.run('calculatorScenarioFromParams("sip", params).error'));
+  }
+  app.context.settings = { mode: "sip", amount: 1000, annualReturn: 1e-8, years: 1, start: "2026-10", stepUp: 1e-8, timing: "begin" };
+  const hash = app.run('calculatorScenarioHash(settings)');
+  app.context.params = new URLSearchParams(hash.split("?")[1]);
+  assert.equal(app.run('calculatorScenarioFromParams("sip", params).settings.annualReturn'), 1e-8);
+});
+
+test("Calculator scenario copying has a selectable fallback when clipboard fails", async () => {
+  const app = setup();
+  app.context.location = { href: "https://example.test/#calculator/swp" };
+  app.context.navigator = { clipboard: { writeText: async () => { throw new Error("denied"); } } };
+  app.run('calculatorState.result = InvestmentCalculator.project({mode:"sip",amount:1000,annualReturn:0,years:1,start:"2026-10",stepUp:0,timing:"begin"})');
+  await app.run('copyCalculatorLink()');
+  assert.equal(app.run('document.querySelector("#calculatorShareFallback").hidden'), false);
+  assert.match(app.run('document.querySelector("#calculatorShareLink").value'), /#calculator\/sip\?v=1/);
+  assert.equal(app.run('document.querySelector("#calculatorShareStatus").textContent'), "Clipboard unavailable");
 });
 
 test("Calculator config and deep links select enabled modes and hide disabled sections", () => {
@@ -507,37 +677,39 @@ test("2027 labels advance YTD while 2026 becomes a past year", () => {
   assert.equal(app.run('state.stats.Nifty50.last'), 14.7);
 });
 
-test("public source hints omit refresh failure details and timestamps", () => {
+test("asset source status dots are not rendered and refresh metadata remains available", () => {
   const app = setup();
   app.run('state.data.refresh = {Nifty50:{status:"cached",lastSuccess:null,lastAttempt:"2026-10-07"}}');
-  const hint = app.run('refreshDot("Nifty50")');
-  assert.ok(hint.includes("saved history"));
-  assert.ok(!hint.includes("failed refresh"));
-  assert.ok(!hint.includes("last attempt"));
-  assert.ok(!hint.includes("2026-10-07"));
+  assert.equal(app.run('refreshInfo("Nifty50").kind'), "cached");
+  for (const filename of ["app.js", "research.js"]) {
+    const source = fs.readFileSync(path.join(root, filename), "utf8");
+    assert.ok(!source.includes("refreshDot"));
+    assert.ok(!source.includes('class="refresh-dot'));
+  }
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   assert.ok(!html.includes('id="assetFreshness"'));
   app.run('delete state.data.refresh');
 });
 
 test("concise README links process and preserves PolyForm and dependency notices", () => {
-  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
-  const method = fs.readFileSync(path.join(root, "docs", "METHOD.md"), "utf8");
-  const license = fs.readFileSync(path.join(root, "LICENSE"), "utf8");
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
+  const method = fs.readFileSync(path.join(repoRoot, "docs", "METHOD.md"), "utf8");
+  const license = fs.readFileSync(path.join(repoRoot, "LICENSE"), "utf8");
   assert.ok(readme.split("\n").length < 80);
   assert.match(readme, /\[docs\/METHOD\.md\]\(docs\/METHOD\.md\)/);
   assert.ok(!readme.includes("tutorial.gif"));
   assert.ok(!readme.includes("18-chapter"));
   for (const heading of ["## Comparison modes", "## Data and year rollover", "## Methodology", "## Local setup"]) assert.ok(method.includes(heading));
-  assert.match(method, /\[ui-config\.js\]\(\.\.\/ui-config\.js\)/);
-  assert.ok(license.startsWith("# PolyForm Noncommercial License 1.0.0\n"));
+  assert.match(method, /\[ui-config\.js\]\(\.\.\/frontend\/ui-config\.js\)/);
+  assert.ok(license.startsWith("PolyForm Noncommercial License 1.0.0\n"));
+  assert.ok(!/^#{1,6} |\*\*|\]\(#|`/m.test(license));
   assert.match(license, /Any noncommercial purpose is a permitted purpose/);
   assert.match(readme, /source-available, not OSI-approved open source/);
   assert.ok(!readme.includes("all rights reserved"));
-  const notice = fs.readFileSync(path.join(root, "NOTICE"), "utf8");
+  const notice = fs.readFileSync(path.join(repoRoot, "NOTICE"), "utf8");
   assert.match(notice, /^Required Notice: Copyright/m);
   assert.match(notice, /does\nnot replace or restrict rights granted by those third-party licenses/);
-  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) assert.match(fs.readFileSync(path.join(root, file), "utf8"), /data.json LICENSE NOTICE /);
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) assert.match(fs.readFileSync(path.join(repoRoot, file), "utf8"), /cp LICENSE NOTICE /);
   assert.match(fs.readFileSync(path.join(root, "vendor", "financial.LICENSE"), "utf8"), /MIT License/);
   assert.match(fs.readFileSync(path.join(root, "vendor", "simple-statistics.LICENSE"), "utf8"), /ISC License/);
 });
@@ -545,7 +717,7 @@ test("concise README links process and preserves PolyForm and dependency notices
 test("dashboard footer links to a deployed standalone methodology page", () => {
   const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
   const page = fs.readFileSync(path.join(root, "methodology.html"), "utf8");
-  const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
+  const readme = fs.readFileSync(path.join(repoRoot, "README.md"), "utf8");
   assert.ok(html.indexOf('<footer class="data-meta">') > html.indexOf('id="summaryView"'));
   assert.match(html, /<footer class="data-meta">\s*<span id="freshness"><\/span>\s*<a href="methodology.html">Data &amp; methodology<\/a>\s*<\/footer>\s*<\/main>/);
   assert.ok(!html.includes('<details class="methodology">'));
@@ -555,7 +727,7 @@ test("dashboard footer links to a deployed standalone methodology page", () => {
   }
   assert.match(page, /href="index.html">Back to dashboard/);
   for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
-    assert.match(fs.readFileSync(path.join(root, file), "utf8"), /cp index.html methodology.html /);
+    assert.match(fs.readFileSync(path.join(repoRoot, file), "utf8"), /cp index.html methodology.html /);
   }
   assert.match(readme, /<a href="https:\/\/indianindices.github.io\/">\s*<img src="docs\/brand.png"/);
   assert.match(readme, /## Support IndianIndices[\s\S]*hosting, data, development and future improvements\.\s*$/);

@@ -9,10 +9,10 @@
 </head>
 <body>
   <div class="site-actions">
-    <button id="openSupport" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><img src="docs/heart.svg" width="16" height="16" alt="">Support</button>
+    <button id="openSupport" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><img src="assets/heart.svg" width="16" height="16" alt="">Support</button>
     <button id="openWaitlist" type="button" aria-haspopup="dialog" aria-controls="waitlistDialog">Join Waitlist</button>
     <a class="repo-link" href="https://github.com/indianindices/indianindices.github.io" target="_blank" rel="noopener noreferrer" aria-label="View GitHub repository" title="View GitHub repository">
-      <img src="docs/github.svg" width="24" height="24" alt="">
+      <img src="assets/github.svg" width="24" height="24" alt="">
     </a>
   </div>
   <aside id="sidebar">
@@ -20,14 +20,17 @@
     <button id="compareBtn" class="nav summary">Compare Sectors</button>
     <button id="summaryBtn" class="nav summary">Market Overview</button>
     <button id="calculatorBtn" class="nav summary" hidden>Calculator</button>
+    <button id="backtestBtn" class="nav summary" hidden>Backtest</button>
     <button id="researchBtn" class="nav summary" hidden>Research</button>
     <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
+    <div id="assetScope" class="period-toggle" role="group" aria-label="Index list"><button type="button" data-scope="all" aria-pressed="true">All indices</button><button type="button" data-scope="watchlist" aria-pressed="false">Watchlist <span id="watchlistCount">0</span></button></div>
+    <span id="watchlistStatus" class="local-status" role="status"></span>
     <div id="assetList"></div>
     <div class="foot" id="foot"></div>
   </aside>
 
   <dialog id="waitlistDialog" aria-labelledby="premiumTitle">
-      <button id="closeWaitlist" type="button" aria-label="Close waitlist" title="Close waitlist"><img src="docs/x.svg" width="20" height="20" alt=""></button>
+      <button id="closeWaitlist" type="button" aria-label="Close waitlist" title="Close waitlist"><img src="assets/x.svg" width="20" height="20" alt=""></button>
       <div class="premium-copy">
         <h2 id="premiumTitle">&#128640; Premium features coming soon</h2>
         <p>Join the waitlist for:</p>
@@ -55,7 +58,7 @@
   </dialog>
 
   <dialog id="supportDialog" aria-labelledby="supportTitle">
-    <button id="closeSupport" type="button" aria-label="Close support" title="Close support" autofocus><img src="docs/x.svg" width="20" height="20" alt=""></button>
+    <button id="closeSupport" type="button" aria-label="Close support" title="Close support" autofocus><img src="assets/x.svg" width="20" height="20" alt=""></button>
     <h2 id="supportTitle">Support IndianIndices</h2>
     <div class="support-options">
       <section aria-labelledby="indiaSupportTitle">
@@ -65,20 +68,20 @@
           <dd><a href="upi://pay?pa=kavincsbi%40ybl">kavincsbi@ybl</a></dd>
         </dl>
         <p class="support-apps">Google Pay &bull; PhonePe &bull; Paytm</p>
-        <a class="support-qr" href="docs/phonepe_gpay.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size UPI QR code">
-          <img src="docs/phonepe_gpay.jpeg" width="683" height="683" alt="UPI payment QR code for kavincsbi@ybl">
+        <a class="support-qr" href="assets/phonepe_gpay.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size UPI QR code">
+          <img src="assets/phonepe_gpay.jpeg" width="683" height="683" alt="UPI payment QR code for kavincsbi@ybl">
         </a>
       </section>
       <section aria-labelledby="internationalSupportTitle">
-        <h3 id="internationalSupportTitle"><img src="docs/globe.svg" width="20" height="20" alt=""> International Support</h3>
+        <h3 id="internationalSupportTitle"><img src="assets/globe.svg" width="20" height="20" alt=""> International Support</h3>
         <dl>
           <dt>PayPal ID</dt>
           <dd>kavinchandra</dd>
           <dt>Direct link</dt>
           <dd><a href="https://www.paypal.me/kavinchandra" target="_blank" rel="noopener noreferrer">paypal.me/kavinchandra</a></dd>
         </dl>
-        <a class="support-qr" href="docs/paypal.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size PayPal QR code">
-          <img src="docs/paypal.jpeg" width="600" height="600" alt="PayPal support QR code for kavinchandra">
+        <a class="support-qr" href="assets/paypal.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open full-size PayPal QR code">
+          <img src="assets/paypal.jpeg" width="600" height="600" alt="PayPal support QR code for kavinchandra">
         </a>
       </section>
     </div>
@@ -95,6 +98,7 @@
         <span id="shareStatus" role="status"></span>
       </div>
       <label id="shareFallback" hidden>Comparison link <input id="shareLink" type="url" readonly></label>
+      <details id="savedComparisonControls" class="saved-comparisons"><summary>Saved comparisons</summary><div class="local-save-controls"><label>Name <input id="comparisonName" type="text" maxlength="48" placeholder="Comparison name"></label><div class="toolbar"><button type="button" id="saveComparison"><img src="assets/plus.svg" width="16" height="16" alt="">Save comparison</button></div></div><span id="savedComparisonStatus" class="local-status" role="status"></span><div id="savedComparisonList"></div></details>
       <div class="card">
         <div class="card-head">
           <div id="compareMode" class="period-toggle" role="group" aria-label="Comparison metric">
@@ -107,7 +111,7 @@
             <button type="button" data-mode="recovery" aria-pressed="false" aria-controls="compareChart">Recovery (quarters)</button>
           </div>
           <div class="toolbar" data-chart="compare">
-            <button data-act="png" title="Download chart as PNG" aria-label="Download comparison chart as PNG"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button>
+            <button data-act="png" title="Download chart as PNG" aria-label="Download comparison chart as PNG"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button>
             <button data-act="all">All</button>
             <button data-act="none">None</button>
           </div>
@@ -116,9 +120,9 @@
           <div class="chart-wrap">
             <div id="compareChart" class="chart tall"></div>
             <div class="toolbar chart-controls" data-chart="compare" role="group" aria-label="Comparison chart navigation">
-              <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button>
-              <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button>
-              <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="docs/maximize.svg" width="16" height="16" alt=""></button>
+              <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="assets/plus.svg" width="16" height="16" alt=""></button>
+              <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="assets/minus.svg" width="16" height="16" alt=""></button>
+              <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="assets/maximize.svg" width="16" height="16" alt=""></button>
             </div>
             <div id="compareTip" class="tip" hidden></div>
           </div>
@@ -148,15 +152,15 @@
             <button type="button" data-period="annual" aria-pressed="false" aria-controls="assetChart">Annual returns</button>
           </div>
           <div class="toolbar" data-chart="asset">
-            <button data-act="png" title="Download chart as PNG" aria-label="Download asset chart as PNG"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button>
+            <button data-act="png" title="Download chart as PNG" aria-label="Download asset chart as PNG"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button>
           </div>
         </div>
         <div class="chart-wrap">
           <div id="assetChart" class="chart"></div>
           <div class="toolbar chart-controls" data-chart="asset" role="group" aria-label="Asset chart navigation">
-            <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button>
-            <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button>
-            <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="docs/maximize.svg" width="16" height="16" alt=""></button>
+            <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="assets/plus.svg" width="16" height="16" alt=""></button>
+            <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="assets/minus.svg" width="16" height="16" alt=""></button>
+            <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="assets/maximize.svg" width="16" height="16" alt=""></button>
           </div>
           <div id="assetTip" class="tip" hidden></div>
         </div>
@@ -211,7 +215,7 @@
           <div class="card-head">
             <h2>Annual returns &mdash; all assets</h2>
             <div class="toolbar" data-chart="summary">
-              <button data-act="png" title="Download chart as PNG" aria-label="Download Market Overview chart as PNG"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button>
+              <button data-act="png" title="Download chart as PNG" aria-label="Download Market Overview chart as PNG"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button>
               <button data-act="all">All</button>
               <button data-act="none">None</button>
             </div>
@@ -220,9 +224,9 @@
             <div class="chart-wrap">
               <div id="summaryChart" class="chart tall"></div>
               <div class="toolbar chart-controls" data-chart="summary" role="group" aria-label="Market Overview chart navigation">
-                <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button>
-                <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button>
-                <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="docs/maximize.svg" width="16" height="16" alt=""></button>
+                <button data-act="in" title="Zoom in (+)" aria-label="Zoom in"><img src="assets/plus.svg" width="16" height="16" alt=""></button>
+                <button data-act="out" title="Zoom out (-)" aria-label="Zoom out"><img src="assets/minus.svg" width="16" height="16" alt=""></button>
+                <button data-act="fit" title="Fit chart to view (F)" aria-label="Fit chart to view"><img src="assets/maximize.svg" width="16" height="16" alt=""></button>
               </div>
             </div>
             <div id="legend" class="legend"></div>
@@ -254,9 +258,12 @@
           <div class="calculator-results">
             <div id="calculatorSummary"><div class="calculator-total"><span id="calculatorTotalLabel">Projected value</span><strong id="calculatorTotal"></strong></div><div id="calculatorMetrics" class="calculator-metrics"></div></div>
             <p id="calculatorStatus" class="hint" role="status" aria-live="polite"></p>
-            <div class="card-head"><div class="calculator-legend"><span><i class="calculator-value-dot"></i><span id="calculatorValueLabel">Investment value</span></span><span><i class="calculator-cash-dot"></i><span id="calculatorCashLabel">Total invested</span></span></div><div class="toolbar"><button type="button" id="calculatorPng"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="calculatorCsv"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
-            <div class="chart-wrap"><div id="calculatorChart" class="chart"></div><div id="calculatorTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="calculator" role="group" aria-label="Calculator chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="docs/maximize.svg" width="16" height="16" alt=""></button></div></div>
+            <div class="toolbar scenario-share"><button type="button" id="calculatorCopyLink">Copy scenario link</button><span id="calculatorShareStatus" class="hint" role="status"></span></div>
+            <label id="calculatorShareFallback" class="scenario-link" hidden>Scenario link <input id="calculatorShareLink" type="url" readonly></label>
+            <div class="card-head"><div class="calculator-legend"><span><i class="calculator-value-dot"></i><span id="calculatorValueLabel">Investment value</span></span><span><i class="calculator-cash-dot"></i><span id="calculatorCashLabel">Total invested</span></span><span id="calculatorSavedLegend"></span></div><div class="toolbar"><button type="button" id="calculatorPng"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="calculatorCsv"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+            <div class="chart-wrap"><div id="calculatorChart" class="chart"></div><div id="calculatorTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="calculator" role="group" aria-label="Calculator chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="assets/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="assets/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="assets/maximize.svg" width="16" height="16" alt=""></button></div></div>
             <span id="calculatorExportStatus" class="export-status" role="status"></span>
+            <section id="savedScenarioSection" class="saved-scenarios"><h2>Saved scenarios</h2><div class="local-save-controls"><label>Name <input id="calculatorScenarioName" type="text" maxlength="48" placeholder="Scenario name"></label><div class="toolbar"><button type="button" id="saveCalculatorScenario"><img src="assets/plus.svg" width="16" height="16" alt="">Save scenario</button></div></div><span id="savedScenarioStatus" class="local-status" role="status"></span><p id="savedScenarioEmpty" class="hint">No saved scenarios</p><div class="table-wrap"><table id="savedScenarioTable" class="grid research-table"></table></div></section>
             <details class="research-details"><summary>Yearly breakdown</summary><div class="table-wrap"><table id="calculatorYearTable" class="grid research-table"></table></div></details>
           </div>
         </div>
@@ -276,7 +283,7 @@
         <label>To <input id="researchTo" type="month" required></label>
       </div>
       <section id="research-quality-panel" class="summary-panel" role="tabpanel" aria-labelledby="research-quality-tab" tabindex="0">
-        <div class="card-head"><h2>History &amp; validation</h2><div class="toolbar"><button type="button" class="research-csv" data-export="quality"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+        <div class="card-head"><h2>History &amp; validation</h2><div class="toolbar"><button type="button" class="research-csv" data-export="quality"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div></div>
         <p id="qualityStatus" class="hint" role="status"></p>
         <div class="table-wrap"><table id="qualityTable" class="grid research-table"></table></div>
         <details id="reconciliationDetails" class="research-details" hidden><summary id="reconciliationCount">Reconciliation exceptions</summary><div class="table-wrap"><table id="reconciliationTable" class="grid research-table"></table></div></details>
@@ -288,7 +295,7 @@
           <label>Min. win rate (%) <input id="screenMinHit" type="number" min="0" max="100" value="0" required></label>
           <label>Sort by <select id="screenSort"><option value="hitRate">Win rate</option><option value="latestExcess">Latest excess</option><option value="meanExcess">Average excess</option><option value="maxDrawdown">Smallest drawdown</option></select></label>
           <label class="research-check"><input id="screenPositive" type="checkbox">Currently beating Nifty50</label>
-          <div class="toolbar"><button type="submit">Apply filters</button><button type="button" id="screenerCsv" class="research-csv" data-export="screener"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div>
+          <div class="toolbar"><button type="submit">Apply filters</button><button type="button" id="screenerCsv" class="research-csv" data-export="screener"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div>
         </form>
         <p id="screenerStatus" class="hint" role="status"></p>
         <div class="table-wrap"><table id="screenerTable" class="grid research-table"></table></div>
@@ -306,18 +313,40 @@
           <div class="portfolio-results">
             <p id="portfolioStatus" class="hint" role="status"></p>
             <div class="chips" id="portfolioMetrics"></div>
-            <div class="card-head"><h2>Portfolio value</h2><div class="toolbar"><button type="button" id="portfolioPng"><img src="docs/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="portfolioCsv" class="research-csv" data-export="portfolio"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
-            <div class="chart-wrap"><div id="portfolioChart" class="chart"></div><div id="portfolioTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="portfolio" role="group" aria-label="Portfolio chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="docs/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="docs/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="docs/maximize.svg" width="16" height="16" alt=""></button></div></div>
+            <div class="card-head"><h2>Portfolio value</h2><div class="toolbar"><button type="button" id="portfolioPng"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="portfolioCsv" class="research-csv" data-export="portfolio"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+            <div class="chart-wrap"><div id="portfolioChart" class="chart"></div><div id="portfolioTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="portfolio" role="group" aria-label="Portfolio chart navigation"><button data-act="in" title="Zoom in" aria-label="Zoom in"><img src="assets/plus.svg" width="16" height="16" alt=""></button><button data-act="out" title="Zoom out" aria-label="Zoom out"><img src="assets/minus.svg" width="16" height="16" alt=""></button><button data-act="fit" title="Fit chart" aria-label="Fit chart"><img src="assets/maximize.svg" width="16" height="16" alt=""></button></div></div>
             <span id="portfolioExportStatus" class="export-status" role="status"></span>
             <p id="portfolioBenchmark" class="hint"></p>
           </div>
         </div>
-        <div class="card-head"><h2>Monthly correlations</h2><div class="toolbar"><button type="button" id="correlationCsv" class="research-csv" data-export="correlation"><img src="docs/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+        <div class="card-head"><h2>Monthly correlations</h2><div class="toolbar"><button type="button" id="correlationCsv" class="research-csv" data-export="correlation"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div></div>
         <p id="correlationStatus" class="hint" role="status"></p>
         <div class="table-wrap"><table id="correlationTable" class="grid research-table"></table></div>
         <p class="hint">Hypothetical index portfolio. No taxes, cash flows or fund tracking differences. Costs apply to purchases and rebalancing; no final liquidation. Nifty50 is buy-and-hold with the same initial purchase cost.</p>
       </section>
       <p class="hint">Past performance is not a forecast. <a href="methodology.html">Research methodology</a></p>
+    </section>
+    <section id="backtestView" hidden>
+      <div class="backtest-heading"><h1>Backtest</h1><div id="backtestRanges" class="period-toggle" role="group" aria-label="Backtest history range"><button type="button" data-months="36" aria-pressed="false">3Y</button><button type="button" data-months="60" aria-pressed="true">5Y</button><button type="button" data-months="120" aria-pressed="false">10Y</button><button type="button" data-months="all" aria-pressed="false">All</button></div></div>
+      <form id="backtestForm" class="research-controls">
+        <label>Investment<select id="backtestMode"><option value="sip">Monthly SIP</option><option value="lumpsum">Lump sum</option></select></label>
+        <label>From<input id="backtestFrom" type="month" required></label>
+        <label>To<input id="backtestTo" type="month" required></label>
+        <label><span id="backtestAmountLabel">Monthly investment (INR)</span><input id="backtestAmount" type="number" min="1" max="1000000000" step="any" value="10000" required></label>
+        <label>Annual SIP increase (%)<input id="backtestStepUp" type="number" min="0" max="50" step="any" value="0" required></label>
+        <label>Contribution timing<select id="backtestTiming"><option value="begin">Month start</option><option value="end">Month end</option></select></label>
+        <label title="1 bp = 0.01%. A 10 bps fee costs INR 10 per INR 10,000 invested.">Purchase costs (bps)<input id="backtestCosts" type="number" min="0" max="500" step="any" value="0" required></label>
+        <div class="toolbar"><button type="submit">Run backtest</button></div>
+      </form>
+      <section id="backtestAllocation" aria-labelledby="backtestAllocationTitle"><div class="backtest-allocation-heading"><div><h2 id="backtestAllocationTitle">Index allocation</h2><span id="backtestSelectedCount"></span></div><span id="backtestWeightTotal" role="status"></span></div><div id="backtestAllocationVisual"><div id="backtestAllocationBar" role="group" aria-label="Allocation"></div><div id="backtestAllocationTip" role="tooltip" hidden></div></div><div class="backtest-allocation-tools"><div class="toolbar"><button type="button" id="backtestEqual">Equal weights</button><button type="button" id="backtestResetWeights">Nifty50 only</button></div></div><div id="backtestWeights"></div></section>
+      <p id="backtestStatus" class="hint" role="status" aria-live="polite"></p>
+      <div id="backtestMetrics" class="backtest-metrics"></div>
+      <div class="card-head"><div class="calculator-legend"><span><i style="background:#6ee7b7"></i>Portfolio</span><span><i style="background:#67e8f9"></i>Nifty50</span><span><i style="background:#fcd34d"></i>Invested</span></div><div class="toolbar"><button type="button" id="backtestCopy">Copy backtest link</button><button type="button" id="backtestPng"><img src="assets/download.svg" width="16" height="16" alt="">PNG</button><button type="button" id="backtestCsv"><img src="assets/download.svg" width="16" height="16" alt="">CSV</button></div></div>
+      <div class="chart-wrap"><div id="backtestChart" class="chart"></div><div id="backtestTip" class="tip" hidden></div><div class="toolbar chart-controls" data-chart="backtest" role="group" aria-label="Chart controls"><button type="button" data-act="in" aria-label="Zoom in" title="Zoom in"><img src="assets/plus.svg" width="18" height="18" alt=""></button><button type="button" data-act="out" aria-label="Zoom out" title="Zoom out"><img src="assets/minus.svg" width="18" height="18" alt=""></button><button type="button" data-act="fit" aria-label="Fit view" title="Fit view"><img src="assets/maximize.svg" width="18" height="18" alt=""></button></div></div>
+      <span id="backtestShareStatus" class="hint" role="status"></span>
+      <label id="backtestShareFallback" class="scenario-link" hidden>Backtest link<input id="backtestShareLink" type="url" readonly></label>
+      <details class="research-details"><summary>Monthly transactions</summary><div class="table-wrap"><table id="backtestTable" class="grid research-table"></table></div></details>
+      <p class="hint">Monthly approximation from rounded source returns; return basis unverified, not assumed to include dividends. Month-start purchases use the prior month-end boundary; month-end purchases receive returns from the following month. Holdings drift without rebalancing; each contribution follows the chosen weights. Nifty50 uses the same cash flows and costs. Drawdown is month-end, cash-flow-neutral performance. Taxes, inflation, fund tracking differences and final liquidation costs are excluded. Past performance is not a forecast.</p>
     </section>
     <section id="noViews" hidden><h1>No views enabled</h1></section>
     <footer class="data-meta">
@@ -335,7 +364,9 @@
   <script src="research.js"></script>
   <script src="vendor/financial.min.js"></script>
   <script src="finance-calculations.js"></script>
+  <script src="personalization.js"></script>
   <script src="calculator.js"></script>
+  <script src="backtest.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
