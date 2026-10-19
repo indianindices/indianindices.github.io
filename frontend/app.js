@@ -19,8 +19,9 @@ function uiFeatureEnabled(feature) {
 }
 
 function applyUiConfig() {
-  const visibility = { "#summaryBtn": "marketOverview", "#calculatorBtn": "calculator", "#backtestBtn": "backtest", "#compareBtn": "compare", "#researchBtn": "research", "#search": "assets", "#assetList": "assets" };
+  const visibility = { "#summaryBtn": "marketOverview", "#calculatorBtn": "calculator", "#backtestBtn": "backtest", "#compareBtn": "compare", "#researchBtn": "research", "#indicesDisclosure": "assets", "#search": "assets", "#assetList": "assets" };
   Object.entries(visibility).forEach(([selector, section]) => ($(selector).hidden = !uiSectionEnabled(section)));
+  $("#openAccountDemo").hidden = !uiFeatureEnabled("accountDemo");
 }
 
 const fmt = (v, d = 2) => (v == null || Number.isNaN(v) ? "—" : `${v > 0 ? "+" : ""}${v.toFixed(d)}%`);
@@ -811,13 +812,15 @@ function renderSidebar() {
       const badge = s ? `<span class="badge" style="background:${s.bg};color:${s.fg}">${fmt(state.stats[n].ytd, 1)}</span>` : "";
       const nav = `<button class="nav ${state.view === "asset" && state.asset === n ? "active" : ""}" data-name="${esc(n)}"><span>${esc(n)}</span><span class="nav-meta">${badge}</span></button>`;
       const favorite = personalState.favorites.has(n);
-      return watching ? `<div class="asset-nav-row">${nav}<button type="button" class="watchlist-star" data-watch="${esc(n)}" aria-pressed="${favorite}" aria-label="${favorite ? "Remove" : "Add"} ${esc(n)} ${favorite ? "from" : "to"} watchlist" title="${favorite ? "Remove from" : "Add to"} watchlist"><img src="assets/star.svg" width="16" height="16" alt=""></button></div>` : nav;
+      return watching ? `<div class="asset-nav-row">${nav}<button type="button" class="watchlist-star" data-watch="${esc(n)}" aria-pressed="${favorite}" aria-label="${favorite ? "Remove" : "Add"} ${esc(n)} ${favorite ? "from" : "to"} watchlist" title="${favorite ? "Remove from" : "Add to"} watchlist"><img src="assets/star.svg" width="20" height="20" alt=""></button></div>` : nav;
     }).join("") || '<p class="nav-empty">No matching indices</p>';
   $("#summaryBtn").classList.toggle("active", state.view === "summary");
+  $("#homeBtn").classList.toggle("active", state.view === "home");
   $("#calculatorBtn").classList.toggle("active", state.view === "calculator");
   $("#backtestBtn").classList.toggle("active", state.view === "backtest");
   $("#compareBtn").classList.toggle("active", state.view === "compare");
   $("#researchBtn").classList.toggle("active", state.view === "research");
+  $("#cryptoBtn").classList.toggle("active", state.view === "crypto");
 }
 
 function route() {
@@ -830,10 +833,11 @@ function route() {
   const name = hash === "support" ? state.asset || state.names[0] : hash.startsWith("asset/") ? hash.slice(6) : null;
   const research = hash === "research" || hash.startsWith("research/");
   const calculator = hash === "calculator" || hash.startsWith("calculator/");
-  const requested = name && state.data.assets[name] ? "assets" : hash === "backtest" ? "backtest" : hash === "compare" ? "compare" : calculator ? "calculator" : research ? "research" : hash === "summary" || hash === "support" ? "marketOverview" : null;
+  const requested = hash === "" || hash === "home" ? "home" : hash === "crypto" ? "crypto" : name && state.data.assets[name] ? "assets" : hash === "backtest" ? "backtest" : hash === "compare" ? "compare" : calculator ? "calculator" : research ? "research" : hash === "summary" || hash === "support" ? "marketOverview" : null;
   const available = ["assets", "marketOverview", "calculator", "compare", "research", "backtest"].filter((section) => uiSectionEnabled(section) && (section !== "assets" || state.names.length));
-  const section = available.includes(requested) ? requested : available[0];
-  ["#assetView", "#summaryView", "#calculatorView", "#compareView", "#researchView", "#backtestView"].forEach((selector) => ($(selector).hidden = true));
+  const section = requested === "home" || requested === "crypto" ? requested : available.includes(requested) ? requested : available[0];
+  ["#homeView", "#cryptoView", "#assetView", "#summaryView", "#calculatorView", "#compareView", "#researchView", "#backtestView"].forEach((selector) => ($(selector).hidden = true));
+  $("#dashboardActions").hidden = !section || section === "home";
   $("#noViews").hidden = !!section;
   if (!section) {
     state.view = null;
@@ -844,7 +848,13 @@ function route() {
     location.hash = section === "assets" ? `asset/${encodeURIComponent(state.names[0])}` : section === "marketOverview" ? "summary" : section === "calculator" ? `calculator/${enabledUiSubsections("calculator")[0]}` : section === "research" ? `research/${enabledUiSubsections("research")[0]}` : section;
     return;
   }
-  if (section === "assets") {
+  if (section === "home") {
+    state.view = "home";
+    $("#homeView").hidden = false;
+  } else if (section === "crypto") {
+    state.view = "crypto";
+    $("#cryptoView").hidden = false;
+  } else if (section === "assets") {
     state.view = "asset";
     state.asset = name || state.names[0];
     $("#assetView").hidden = false;

@@ -8,12 +8,15 @@
 
   const dialog = document.querySelector("#waitlistDialog");
   const openButton = document.querySelector("#openWaitlist");
+  const cryptoWaitlistButton = document.querySelector("#cryptoWaitlistBtn");
   const closeButton = document.querySelector("#closeWaitlist");
   let signedUp = false;
   const openDialog = () => {
     if (!dialog.open && !document.querySelector("#supportDialog")?.open) dialog.showModal();
   };
+  const isQuietRoute = () => window.location && ["", "#home", "#crypto"].includes(window.location.hash);
   openButton.addEventListener("click", openDialog);
+  cryptoWaitlistButton?.addEventListener("click", openDialog);
   closeButton.addEventListener("click", () => dialog.close());
   dialog.addEventListener("click", (event) => {
     if (event.target !== dialog) return;
@@ -22,9 +25,9 @@
       dialog.close();
     }
   });
-  openDialog();
-  const reminders = [5 * 60 * 1000, 10 * 60 * 1000].map((delay) => setTimeout(() => {
-    if (!signedUp) openDialog();
+  if (!isQuietRoute()) openDialog();
+  const reminders = isQuietRoute() ? [] : [5 * 60 * 1000, 10 * 60 * 1000].map((delay) => setTimeout(() => {
+    if (!signedUp && !isQuietRoute()) openDialog();
   }, delay));
 
   if (!config?.url || !config?.publishableKey) {

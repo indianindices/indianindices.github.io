@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Account Review Demo | IndianIndices</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="demo-page">
+  <main class="demo-shell">
+    <header class="demo-header">
+      <a class="demo-brand" href="index.html">Indian<span>Indices</span></a>
+      <a href="index.html">Back to dashboard</a>
+    </header>
+
+    <p class="demo-notice"><strong>Review demo only.</strong> This page uses fictional sample data. It does not connect to Zerodha, place trades, or display live or historical market data. The demo credentials are public and must not be used for any real account.</p>
+
+    <section id="demoLogin" class="demo-login" aria-labelledby="demoLoginTitle">
+      <h1 id="demoLoginTitle">Private account analytics</h1>
+      <p class="demo-credentials">Demo username: <code>reviewer@indianindices.test</code><br>Demo password: <code>sample-only-2026</code></p>
+      <form id="demoLoginForm">
+        <label for="demoUsername">Username</label>
+        <input id="demoUsername" name="username" type="text" autocomplete="off" required>
+        <label for="demoPassword">Password</label>
+        <input id="demoPassword" name="password" type="password" autocomplete="off" required>
+        <button type="submit">Open sample account</button>
+        <p id="demoLoginStatus" class="demo-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section id="demoDashboard" class="demo-dashboard" aria-labelledby="demoAccountTitle" hidden>
+      <div class="demo-account-head">
+        <div>
+          <h1 id="demoAccountTitle">Demo Investor</h1>
+          <p>Illustrative account overview</p>
+        </div>
+        <button id="demoSignOut" class="demo-signout" type="button">Sign out</button>
+      </div>
+
+      <div class="demo-summary" aria-label="Sample portfolio summary">
+        <div class="demo-metric"><span>Portfolio value</span><strong>₹8,42,650</strong></div>
+        <div class="demo-metric"><span>Invested amount</span><strong>₹7,95,000</strong></div>
+        <div class="demo-metric"><span>Unrealised P&amp;L</span><strong class="demo-positive">+₹47,650</strong></div>
+      </div>
+
+      <div class="demo-tabs" role="tablist" aria-label="Sample account views">
+        <button type="button" role="tab" id="demoTabHoldings" aria-controls="demoPanelHoldings" aria-selected="true" data-demo-tab="holdings">Holdings</button>
+        <button type="button" role="tab" id="demoTabPositions" aria-controls="demoPanelPositions" aria-selected="false" data-demo-tab="positions" tabindex="-1">Positions</button>
+        <button type="button" role="tab" id="demoTabOrders" aria-controls="demoPanelOrders" aria-selected="false" data-demo-tab="orders" tabindex="-1">Order book</button>
+        <button type="button" role="tab" id="demoTabTrades" aria-controls="demoPanelTrades" aria-selected="false" data-demo-tab="trades" tabindex="-1">Trade book</button>
+      </div>
+
+      <section id="demoPanelHoldings" class="demo-panel" role="tabpanel" aria-labelledby="demoTabHoldings" data-demo-panel="holdings">
+        <h2>Holdings</h2>
+        <div class="demo-table-wrap"><table class="demo-table"><thead><tr><th>Instrument</th><th>Units</th><th>Average cost</th><th>Sample value</th><th>Sample P&amp;L</th></tr></thead><tbody>
+          <tr><td>Sample Equity A</td><td>24</td><td>₹11,666.67</td><td>₹3,16,800.00</td><td class="demo-positive">+₹36,800.00</td></tr>
+          <tr><td>Sample ETF B</td><td>150</td><td>₹2,000.00</td><td>₹3,45,000.00</td><td class="demo-positive">+₹45,000.00</td></tr>
+          <tr><td>Sample Equity C</td><td>40</td><td>₹5,375.00</td><td>₹1,80,850.00</td><td class="demo-negative">-₹34,150.00</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section id="demoPanelPositions" class="demo-panel" role="tabpanel" aria-labelledby="demoTabPositions" data-demo-panel="positions" hidden>
+        <h2>Positions</h2>
+        <div class="demo-table-wrap"><table class="demo-table"><thead><tr><th>Instrument</th><th>Product</th><th>Quantity</th><th>Average price</th><th>Sample P&amp;L</th></tr></thead><tbody>
+          <tr><td>Sample Equity D</td><td>Intraday</td><td>10</td><td>₹425.50</td><td class="demo-positive">+₹185.00</td></tr>
+          <tr><td>Sample Index Future</td><td>Carry forward</td><td>-1</td><td>₹22,100.00</td><td class="demo-negative">-₹320.00</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <section id="demoPanelOrders" class="demo-panel" role="tabpanel" aria-labelledby="demoTabOrders" data-demo-panel="orders" hidden>
+        <h2>Order book</h2>
+        <div class="demo-table-wrap"><table class="demo-table"><thead><tr><th>Sample order</th><th>Side</th><th>Quantity</th><th>Type</th><th>Status</th></tr></thead><tbody>
+          <tr><td>DEMO-ORDER-001</td><td>Buy</td><td>10</td><td>Limit</td><td>Complete</td></tr>
+          <tr><td>DEMO-ORDER-002</td><td>Sell</td><td>5</td><td>Market</td><td>Rejected</td></tr>
+        </tbody></table></div>
+        <p class="demo-caption">Illustrative only. Kite's standard order-book endpoint returns that day's orders; this sample is not an API response.</p>
+      </section>
+
+      <section id="demoPanelTrades" class="demo-panel" role="tabpanel" aria-labelledby="demoTabTrades" data-demo-panel="trades" hidden>
+        <h2>Trade book</h2>
+        <div class="demo-table-wrap"><table class="demo-table"><thead><tr><th>Sample trade</th><th>Side</th><th>Quantity</th><th>Sample fill price</th><th>Time</th></tr></thead><tbody>
+          <tr><td>DEMO-TRADE-001</td><td>Buy</td><td>10</td><td>₹425.00</td><td>10:14</td></tr>
+          <tr><td>DEMO-TRADE-002</td><td>Sell</td><td>5</td><td>₹438.20</td><td>11:32</td></tr>
+        </tbody></table></div>
+        <p class="demo-caption">Illustrative only. No order or trade was sent to any broker or exchange.</p>
+      </section>
+      <p class="demo-caption">All figures and records on this page are fictional placeholders, not market data, a broker response, or investment advice.</p>
+    </section>
+  </main>
+  <script src="demo.js"></script>
+</body>
+</html>

@@ -3,12 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Indian Sector Returns</title>
+  <title>Indian Sectors | Returns, comparison and risk</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
   <div class="site-actions">
+    <a id="openAccountDemo" class="icon-action" href="account-demo.html" aria-label="Account demo" title="Account demo" hidden><img src="assets/user-round.svg" width="20" height="20" alt=""></a>
     <button id="openSupport" type="button" aria-haspopup="dialog" aria-controls="supportDialog"><img src="assets/heart.svg" width="16" height="16" alt="">Support</button>
     <button id="openWaitlist" type="button" aria-haspopup="dialog" aria-controls="waitlistDialog">Join Waitlist</button>
     <a class="repo-link" href="https://github.com/indianindices/indianindices.github.io" target="_blank" rel="noopener noreferrer" aria-label="View GitHub repository" title="View GitHub repository">
@@ -17,15 +18,19 @@
   </div>
   <aside id="sidebar">
     <div class="brand">Indian<span>Sectors</span></div>
-    <button id="compareBtn" class="nav summary">Compare Sectors</button>
     <button id="summaryBtn" class="nav summary">Market Overview</button>
-    <button id="calculatorBtn" class="nav summary" hidden>Calculator</button>
-    <button id="backtestBtn" class="nav summary" hidden>Backtest</button>
+    <button id="compareBtn" class="nav summary">Compare Sectors</button>
     <button id="researchBtn" class="nav summary" hidden>Research</button>
-    <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
-    <div id="assetScope" class="period-toggle" role="group" aria-label="Index list"><button type="button" data-scope="all" aria-pressed="true">All indices</button><button type="button" data-scope="watchlist" aria-pressed="false">Watchlist <span id="watchlistCount">0</span></button></div>
-    <span id="watchlistStatus" class="local-status" role="status"></span>
-    <div id="assetList"></div>
+    <details id="indicesDisclosure" class="indices-disclosure">
+      <summary class="nav summary"><span>All Indices</span><span class="indices-chevron" aria-hidden="true"></span></summary>
+      <div class="indices-content">
+        <input id="search" type="search" placeholder="Search assets..." autocomplete="off">
+        <div id="assetScope" class="period-toggle" role="group" aria-label="Index list"><button type="button" data-scope="all" aria-pressed="true">All indices</button><button type="button" data-scope="watchlist" aria-pressed="false">Watchlist <span id="watchlistCount">0</span></button></div>
+        <span id="watchlistStatus" class="local-status" role="status"></span>
+        <div id="assetList"></div>
+      </div>
+    </details>
+    <a id="cryptoBtn" class="nav summary crypto-nav" href="#crypto">Crypto</a>
     <div class="foot" id="foot"></div>
   </aside>
 
@@ -88,6 +93,72 @@
   </dialog>
 
   <main>
+    <nav id="dashboardActions" class="dashboard-actions" aria-label="Dashboard shortcuts" hidden>
+      <a id="dashboardHomeBtn" href="#home">Home</a>
+      <button id="backtestBtn" type="button" hidden>Backtest</button>
+      <button id="calculatorBtn" type="button" hidden>Calculator</button>
+    </nav>
+    <section id="homeView" class="home-view" hidden>
+      <nav class="home-shortcuts" aria-label="Explore dashboard">
+        <a id="homeBtn" href="#home">Home</a>
+        <a href="#summary">Market Overview</a>
+        <a href="#compare">Compare Sectors</a>
+        <a href="#backtest">Backtest</a>
+        <a href="#calculator/sip">Calculator</a>
+      </nav>
+      <div class="home-hero">
+        <div class="home-copy">
+          <p class="home-kicker">INDIAN MARKET CYCLES</p>
+          <h1>Indian Sectors</h1>
+          <p class="home-lede">Read the cycle. Compare the risk.</p>
+          <p class="home-description">Explore how India's sectors move through changing markets.</p>
+          <div class="home-actions">
+            <a class="home-primary" href="#summary">Explore market overview</a>
+            <a class="home-secondary" href="#compare">Compare sectors <span aria-hidden="true">&#8594;</span></a>
+          </div>
+        </div>
+        <figure class="home-art">
+          <img src="assets/indian-sectors-brand.png" width="1200" height="360" alt="Indian Sectors brand artwork: a bull for momentum, a bear for drawdown, and market candles">
+        </figure>
+      </div>
+      <div class="home-signals" aria-label="Dashboard coverage">
+        <div><strong>26</strong><span>Indian indices</span></div>
+        <div><strong>Returns</strong><span>Across market cycles</span></div>
+        <div><strong>Risk</strong><span>Alongside performance</span></div>
+      </div>
+      <nav class="home-quicklinks" aria-label="Explore Indian Sectors">
+        <a class="home-tile home-tile-overview" href="#summary">
+          <span class="home-tile-top"><span class="home-link-index">01</span><span class="home-tile-tag">SEE THE BIG PICTURE</span></span>
+          <span class="home-tile-title">Market overview</span>
+          <span class="home-tile-bottom"><span>Track returns and market cycles.</span><span class="home-tile-arrow" aria-hidden="true">&#8599;</span></span>
+        </a>
+        <a class="home-tile home-tile-compare" href="#compare">
+          <span class="home-tile-top"><span class="home-link-index">02</span><span class="home-tile-tag">FIND THE DIFFERENCE</span></span>
+          <span class="home-tile-title">Compare sectors</span>
+          <span class="home-tile-bottom"><span>Put performance and risk side by side.</span><span class="home-tile-arrow" aria-hidden="true">&#8599;</span></span>
+        </a>
+        <a class="home-tile home-tile-calculator" href="#calculator/sip">
+          <span class="home-tile-top"><span class="home-link-index">03</span><span class="home-tile-tag">PLAN YOUR INVESTING</span></span>
+          <span class="home-tile-title">Investment calculators</span>
+          <span class="home-tile-bottom"><span>Explore SIP, lump-sum and SWP scenarios.</span><span class="home-tile-arrow" aria-hidden="true">&#8599;</span></span>
+        </a>
+      </nav>
+    </section>
+    <section id="cryptoView" class="crypto-view" hidden>
+      <div class="crypto-panel">
+        <div class="crypto-copy">
+          <p class="crypto-kicker">A NEW MARKET, ON OUR RADAR</p>
+          <h1>Crypto is coming soon.</h1>
+          <p>We’re exploring a thoughtful way to compare digital assets alongside the markets you already follow.</p>
+          <button id="cryptoWaitlistBtn" class="crypto-cta" type="button" aria-haspopup="dialog" aria-controls="waitlistDialog">Join the crypto waitlist <span aria-hidden="true">&#8599;</span></button>
+          <p class="crypto-note">No predictions. Just research, when it’s ready.</p>
+        </div>
+        <figure class="crypto-dog">
+          <img src="assets/crypto-happy-dog.gif" width="240" height="180" alt="A happy golden dog wagging its tail">
+          <figcaption>Good things take a little research.</figcaption>
+        </figure>
+      </div>
+    </section>
     <section id="compareView" hidden>
       <h1>Compare Sectors</h1>
       <div class="range-controls" aria-label="Comparison date range">

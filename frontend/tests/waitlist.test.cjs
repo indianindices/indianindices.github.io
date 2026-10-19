@@ -11,7 +11,7 @@ const repoRoot = path.join(root, "..");
 const source = fs.readFileSync(path.join(root, "waitlist.js"), "utf8");
 const visitorId = "10000000-0000-4000-8000-000000000001";
 
-function setup({ config = { url: "https://example.supabase.co", publishableKey: "sb_publishable_test" }, storage = new Map(), fail = false, storageBlocked = false } = {}) {
+function setup({ config = { url: "https://example.supabase.co", publishableKey: "sb_publishable_test" }, storage = new Map(), fail = false, storageBlocked = false, hash = "#summary" } = {}) {
   const requests = [];
   const elements = new Map();
   const timers = new Map();
@@ -26,6 +26,7 @@ function setup({ config = { url: "https://example.supabase.co", publishableKey: 
   };
   elements.set("#waitlistDialog", dialog);
   elements.set("#openWaitlist", { addEventListener(name, handler) { handlers.set(`open:${name}`, handler); } });
+  elements.set("#cryptoWaitlistBtn", { addEventListener(name, handler) { handlers.set(`crypto-open:${name}`, handler); } });
   elements.set("#closeWaitlist", { addEventListener(name, handler) { handlers.set(`close:${name}`, handler); } });
   let submit;
   const form = {
@@ -39,7 +40,7 @@ function setup({ config = { url: "https://example.supabase.co", publishableKey: 
   elements.set("#waitlistSubmit", { disabled: false, textContent: "Join Waitlist" });
   elements.set("#waitlistStatus", { textContent: "" });
   vm.runInNewContext(source, {
-    window: { SUPABASE_CONFIG: config },
+    window: { SUPABASE_CONFIG: config, location: { hash } },
     document: { querySelector: (selector) => elements.get(selector) },
     localStorage: {
       getItem(key) { if (storageBlocked) throw new Error(); return storage.get(key); },
@@ -65,6 +66,22 @@ test("popup opens on arrival, at five minutes, and at ten minutes only", () => {
   app.dialog.close();
   app.timers.get(600000)();
   assert.equal(app.dialog.showCount, 3);
+});
+
+test("home route leaves the landing page clear while keeping manual waitlist access", () => {
+  const app = setup({ hash: "" });
+  assert.equal(app.dialog.showCount, 0);
+  assert.equal(app.timers.size, 0);
+  app.handlers.get("open:click")();
+  assert.equal(app.dialog.open, true);
+});
+
+test("Crypto route leaves the coming-soon page visible until its waitlist CTA is clicked", () => {
+  const app = setup({ hash: "#crypto" });
+  assert.equal(app.dialog.showCount, 0);
+  assert.equal(app.timers.size, 0);
+  app.handlers.get("crypto-open:click")();
+  assert.equal(app.dialog.open, true);
 });
 
 test("manual reopening works and reminders never stack an already open popup", () => {

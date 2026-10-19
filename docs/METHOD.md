@@ -391,12 +391,14 @@ to run the dashboard. The default font path is DejaVu Sans Bold on Linux.
 ```bash
 python -m pip install Pillow
 python3 docs/make_banner.py
+python3 docs/make_crypto_dog.py
 convert docs/brand.gif -layers Optimize docs/brand.gif
 ```
 
 Use `--font /path/to/font.ttf` for a different font location. The generator
 produces an optional animated banner and the static [header artwork](brand.png)
-used in the repository README.
+used in the repository README. The Crypto page's original animated dog is also
+generated locally as a playful placeholder, not market content.
 
 ## Publication and Dependencies
 

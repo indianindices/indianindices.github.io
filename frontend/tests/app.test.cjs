@@ -99,8 +99,13 @@ test("Backtest allocation stays visible, segments expose labels and totals expos
 test("watchlist icon has an explicit stroke and a fixed unpadded visible button", () => {
   const icon = fs.readFileSync(path.join(root, "assets/star.svg"), "utf8");
   const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
+  const app = fs.readFileSync(path.join(root, "app.js"), "utf8");
   assert.ok(icon.includes('stroke="#000000"'));
   assert.match(css, /\.watchlist-star, \.icon-command \{[^}]*padding: 0;/);
+  assert.match(css, /\.watchlist-star \{ width: 32px; height: 32px; flex-basis: 32px; \}/);
+  assert.match(css, /\.watchlist-star img \{ width: 20px; height: 20px; opacity: 1; \}/);
+  assert.ok(app.includes('class="watchlist-star" data-watch='));
+  assert.ok(app.includes('src="assets/star.svg" width="20" height="20"'));
 });
 
 test("UI config disables Research by default and rejects its deep links", () => {
@@ -154,6 +159,50 @@ test("UI config supports disabling every view without a redirect loop", () => {
   assert.equal(app.run('state.view'), null);
   assert.equal(app.run('document.querySelector("#noViews").hidden'), false);
   assert.equal(app.context.location.hash, "#summary");
+});
+
+test("dashboard pairs Backtest with Calculator and keeps sidebar indices in a collapsed watchlist disclosure", () => {
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const actionsStart = html.indexOf('id="dashboardActions"');
+  const actions = html.slice(actionsStart, html.indexOf("</nav>", actionsStart));
+  assert.ok(actions.indexOf('id="dashboardHomeBtn"') < actions.indexOf('id="backtestBtn"'));
+  assert.ok(actions.indexOf('id="backtestBtn"') < actions.indexOf('id="calculatorBtn"'));
+  const sidebarStart = html.indexOf('<aside id="sidebar">');
+  const sidebar = html.slice(sidebarStart, html.indexOf("</aside>", sidebarStart));
+  assert.ok(sidebar.indexOf('id="summaryBtn"') < sidebar.indexOf('id="compareBtn"'));
+  assert.ok(!sidebar.includes('id="backtestBtn"'));
+  assert.ok(!sidebar.includes('id="calculatorBtn"'));
+  assert.match(html, /<details id="indicesDisclosure" class="indices-disclosure">/);
+  assert.ok(!/<details[^>]*\bopen\b/.test(html));
+  const disclosureStart = html.indexOf('id="indicesDisclosure"');
+  const disclosure = html.slice(disclosureStart, html.indexOf("</details>", disclosureStart));
+  for (const id of ["search", "assetScope", "watchlistStatus", "assetList"]) assert.ok(disclosure.includes(`id="${id}"`));
+  assert.match(html, /<summary class="nav summary"><span>All Indices<\/span>/);
+  const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
+  assert.match(css, /\.nav \{[^}]*text-decoration: none;/);
+  assert.doesNotMatch(css, /\.crypto-nav[^}]*color:/);
+  assert.match(css, /\.indices-disclosure\[open\] \.indices-content \{ height: clamp\(/);
+  assert.match(css, /\.indices-disclosure:not\(\[open\]\) > \.indices-content \{ display: none; \}/);
+  assert.match(css, /#sidebar \{[^}]*overflow-x: hidden;[\s\S]*?overflow-y: auto;/);
+  assert.match(css, /@media \(max-width: 900px\) \{\s+#sidebar \{ overflow: visible; \}/);
+});
+
+test("Crypto navigation opens the coming-soon view without changing dashboard routes", () => {
+  const app = setup();
+  app.context.location = { hash: "#crypto" };
+  app.context.window = { scrollTo() {} };
+  app.run('renderSidebar = () => {}; route()');
+  assert.equal(app.run('state.view'), "crypto");
+  assert.equal(app.run('document.querySelector("#cryptoView").hidden'), false);
+  app.context.location.hash = "#summary";
+  app.run("route()");
+  assert.equal(app.run('state.view'), "summary");
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  assert.ok(html.indexOf('id="cryptoBtn"') > html.indexOf('id="indicesDisclosure"'));
+  assert.match(html, /id="cryptoWaitlistBtn"/);
+  assert.match(html, /assets\/crypto-happy-dog\.gif/);
+  const dog = fs.readFileSync(path.join(root, "assets", "crypto-happy-dog.gif"));
+  assert.match(dog.toString("ascii", 0, 6), /^GIF8[79]a$/);
 });
 
 test("UI config normalizes disabled Research tab links and is staged before app.js", () => {
@@ -617,6 +666,55 @@ test("support deep links render the dashboard without rewriting the support hash
   assert.equal(app.run("state.view"), "asset");
   assert.equal(app.run("state.asset"), realData.assets.Nifty50 ? "Nifty50" : Object.keys(realData.assets)[0]);
   assert.equal(app.run('document.querySelector("#assetView").hidden'), false);
+});
+
+test("empty URL and #home open the landing view while dashboard deep links remain intact", () => {
+  const app = setup();
+  app.context.location = { hash: "" };
+  app.context.window = { scrollTo() {} };
+  app.run("renderSidebar = () => {}; route()");
+  assert.equal(app.run("state.view"), "home");
+  assert.equal(app.run('document.querySelector("#homeView").hidden'), false);
+  app.context.location.hash = "#summary";
+  app.run("route()");
+  assert.equal(app.run("state.view"), "summary");
+  app.context.location.hash = "#home";
+  app.run("route()");
+  assert.equal(app.run("state.view"), "home");
+  const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
+  const css = fs.readFileSync(path.join(root, "style.css"), "utf8");
+  assert.match(html, /id="homeBtn" href="#home"/);
+  assert.match(html, /id="homeView"/);
+  assert.ok(html.indexOf('id="homeBtn"') > html.indexOf('id="homeView"'));
+  const dashboardActionsStart = html.indexOf('id="dashboardActions"');
+  const dashboardActions = html.slice(dashboardActionsStart, html.indexOf("</nav>", dashboardActionsStart));
+  assert.ok(dashboardActions.indexOf('id="dashboardHomeBtn"') < dashboardActions.indexOf('id="backtestBtn"'));
+  assert.ok(dashboardActionsStart < html.indexOf('id="compareView"'));
+  assert.ok(!html.includes('id="sidebarHomeBtn"'));
+  const homeShortcutsStart = html.indexOf('<nav class="home-shortcuts"');
+  const homeShortcuts = html.slice(homeShortcutsStart, html.indexOf("</nav>", homeShortcutsStart));
+  let previousShortcut = -1;
+  for (const target of ['href="#home"', 'href="#summary"', 'href="#compare"', 'href="#backtest"', 'href="#calculator/sip"']) {
+    const position = homeShortcuts.indexOf(target);
+    assert.ok(position > previousShortcut, `${target} should follow the previous shortcut`);
+    previousShortcut = position;
+  }
+  assert.match(html, /indian-sectors-brand\.png/);
+  assert.match(css, /\.home-shortcuts \{ position: absolute; top: calc\(18px - var\(--main-top-padding\)\); left: 0;/);
+  assert.match(css, /body:has\(#homeView:not\(\[hidden\]\)\) #sidebar \{ display: none; \}/);
+  assert.ok(fs.existsSync(path.join(root, "assets", "user-round.svg")));
+  for (const file of ["dev.sh", ".github/workflows/update-data.yml"]) {
+    assert.match(fs.readFileSync(path.join(repoRoot, file), "utf8"), /brand\.png .*indian-sectors-brand\.png/);
+  }
+});
+
+test("account demo icon follows its disabled-by-default feature flag", () => {
+  const app = setup();
+  app.run("applyUiConfig()");
+  assert.equal(app.run('document.querySelector("#openAccountDemo").hidden'), true);
+  app.run("UI_CONFIG.features.accountDemo = true; applyUiConfig()");
+  assert.equal(app.run('document.querySelector("#openAccountDemo").hidden'), false);
+  assert.match(fs.readFileSync(path.join(root, "ui-config.js"), "utf8"), /accountDemo: false/);
 });
 
 test("drawdowns and recovery durations track regained and unrecovered peaks", () => {

@@ -83,9 +83,11 @@ jobs:
           mkdir -p _site/assets _site/vendor
           cp LICENSE NOTICE _site/
           cd frontend
-          cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js backtest.js personalization.js waitlist.js support.js style.css data.json ../_site/
+          cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js backtest.js personalization.js waitlist.js support.js style.css data.json account-demo.html demo.js ../_site/
           cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE ../_site/vendor/
           cp assets/*.svg assets/lucide.LICENSE assets/phonepe_gpay.jpeg assets/paypal.jpeg ../_site/assets/
+          cp assets/crypto-happy-dog.gif ../_site/assets/
+          cp ../docs/brand.png ../_site/assets/indian-sectors-brand.png
 
       - uses: actions/upload-pages-artifact@v3
         with:

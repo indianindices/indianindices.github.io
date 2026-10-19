@@ -12,9 +12,11 @@ fi
 mkdir -p .preview/assets .preview/vendor
 (
   cd frontend
-  cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js backtest.js personalization.js waitlist.js support.js style.css data.json ../.preview/
+  cp index.html methodology.html ui-config.js app.js analytics.js research.js finance-calculations.js calculator.js backtest.js personalization.js waitlist.js support.js style.css data.json account-demo.html demo.js ../.preview/
   cp vendor/simple-statistics.min.js vendor/simple-statistics.LICENSE vendor/financial.min.js vendor/financial.LICENSE ../.preview/vendor/
   cp assets/*.svg assets/lucide.LICENSE assets/phonepe_gpay.jpeg assets/paypal.jpeg ../.preview/assets/
+  cp assets/crypto-happy-dog.gif ../.preview/assets/
+  cp ../docs/brand.png ../.preview/assets/indian-sectors-brand.png
 )
 cp LICENSE NOTICE .preview/
 node backend/scripts/generate-config.mjs .preview/supabase-config.js

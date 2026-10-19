@@ -3,6 +3,7 @@ const UI_CONFIG = {
     calculatorSharing: true,
     savedScenarios: true,
     watchlists: true,
+    accountDemo: false,
   },
   sections: {
     assets: true,
